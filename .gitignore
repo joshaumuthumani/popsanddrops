@@ -1,0 +1,29 @@
+# dependencies
+node_modules
+.pnp
+.pnp.js
+
+# build output
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+
+# env / secrets — never commit real keys
+.env
+.env.*
+!.env.example
+serviceAccount*.json
+
+# firebase
+.firebase
+firebase-debug.log
+functions/node_modules
+functions/lib
+
+# editor / os
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.log

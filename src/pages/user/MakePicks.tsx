@@ -1,0 +1,199 @@
+import { useMemo, useState } from 'react';
+import type { Game } from '@/types';
+import { Card, GoldButton, LiveBanner, SectionLabel } from '@/components/primitives';
+import { PickButton } from '@/components/PickButton';
+import { Countdown } from '@/components/Countdown';
+import { Toast } from '@/components/Toast';
+
+interface Props {
+  game: Game;
+  initialMatchPicks?: Record<string, string>;
+  initialPropPicks?: Record<string, string>;
+  initialTiebreaker?: string;
+}
+
+/** USER · MAKE PICKS — two sections + tiebreaker, live countdown, "Lock In Your Picks". */
+export function MakePicks({ game, initialMatchPicks = {}, initialPropPicks = {}, initialTiebreaker = '' }: Props) {
+  const [matchPicks, setMatchPicks] = useState<Record<string, string>>(initialMatchPicks);
+  const [propPicks, setPropPicks] = useState<Record<string, string>>(initialPropPicks);
+  const [tiebreaker, setTiebreaker] = useState(initialTiebreaker);
+  const [toastOpen, setToastOpen] = useState(false);
+
+  const total = game.matches.length + game.propBets.length;
+  const made = Object.keys(matchPicks).length + Object.keys(propPicks).length;
+  const pct = Math.round((made / total) * 100);
+  const allAnswered = made === total && tiebreaker.trim() !== '';
+
+  const lockLabel = useMemo(() => new Date(game.lockTime).toLocaleString(), [game.lockTime]);
+
+  return (
+    <section>
+      <div style={{ marginBottom: 22 }}>
+        <LiveBanner
+          title="Get your picks in before the bell"
+          subtitle="Submit before the countdown hits zero — picks freeze after that."
+          right={
+            <div className="text-right" title={lockLabel}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', color: '#6B7A99' }}>LOCKS IN</div>
+              <Countdown targetMs={game.lockTime} />
+            </div>
+          }
+        />
+      </div>
+
+      {/* progress */}
+      <div className="flex items-center gap-3.5" style={{ marginBottom: 18 }}>
+        <div style={{ flex: 1, height: 7, borderRadius: 4, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
+          <div
+            style={{
+              height: '100%',
+              width: `${pct}%`,
+              background: 'linear-gradient(90deg,#E7C92F,#F4DB6B)',
+              borderRadius: 4,
+              transition: 'width .35s cubic-bezier(.16,1,.3,1)',
+            }}
+          />
+        </div>
+        <span className="font-extrabold whitespace-nowrap" style={{ fontSize: 13, color: '#C8D4E8' }}>
+          {made} of {total} locked in
+        </span>
+      </div>
+
+      {/* MATCH PREDICTIONS */}
+      <SectionLabel style={{ margin: '6px 0 14px' }}>Match predictions · 1 Pop each</SectionLabel>
+      <div className="flex flex-col gap-3" style={{ marginBottom: 30 }}>
+        {game.matches.map((m) => {
+          const multi = m.options.length > 2;
+          return (
+            <Card key={m.id} style={{ padding: '16px 18px' }}>
+              <div className="flex items-center justify-between gap-2.5" style={{ marginBottom: 12 }}>
+                <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#6B7A99' }}>{m.name}</span>
+                {multi && (
+                  <span
+                    style={{
+                      fontSize: 9.5,
+                      fontWeight: 800,
+                      letterSpacing: '.08em',
+                      color: '#77E0E8',
+                      background: 'rgba(119,224,232,.12)',
+                      padding: '3px 8px',
+                      borderRadius: 999,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    PICK 1 OF {m.options.length}
+                  </span>
+                )}
+              </div>
+              {multi ? (
+                <div className="flex flex-col gap-2">
+                  {m.options.map((opt) => (
+                    <PickButton
+                      key={opt}
+                      align="left"
+                      selected={matchPicks[m.id] === opt}
+                      onClick={() => setMatchPicks((p) => ({ ...p, [m.id]: opt }))}
+                    >
+                      {opt}
+                    </PickButton>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 34px 1fr', gap: 10, alignItems: 'center' }}>
+                  <PickButton selected={matchPicks[m.id] === m.options[0]} onClick={() => setMatchPicks((p) => ({ ...p, [m.id]: m.options[0] }))}>
+                    {m.options[0]}
+                  </PickButton>
+                  <span className="text-center" style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: '#6B7A99' }}>
+                    VS
+                  </span>
+                  <PickButton selected={matchPicks[m.id] === m.options[1]} onClick={() => setMatchPicks((p) => ({ ...p, [m.id]: m.options[1] }))}>
+                    {m.options[1]}
+                  </PickButton>
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* PROP BETS */}
+      <SectionLabel style={{ margin: '6px 0 14px' }}>Prop bets · 1 Pop each</SectionLabel>
+      <div className="flex flex-col gap-3" style={{ marginBottom: 18 }}>
+        {game.propBets.map((p) => (
+          <Card key={p.id} style={{ padding: '16px 18px' }} className="flex items-center justify-between gap-4 flex-wrap">
+            <div style={{ fontWeight: 700, fontSize: 14.5, color: '#C8D4E8' }}>{p.question}</div>
+            <div className="flex gap-2 flex-wrap">
+              {p.options.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => setPropPicks((prev) => ({ ...prev, [p.id]: opt }))}
+                  className="cursor-pointer font-extrabold transition-all duration-200"
+                  style={{
+                    fontFamily: 'inherit',
+                    fontSize: 13.5,
+                    padding: p.options.length > 2 ? '10px 18px' : '10px 22px',
+                    borderRadius: 9,
+                    border: `1.5px solid ${propPicks[p.id] === opt ? '#E7C92F' : 'rgba(255,255,255,.1)'}`,
+                    background: propPicks[p.id] === opt ? 'rgba(231,201,47,.14)' : 'rgba(255,255,255,.03)',
+                    color: propPicks[p.id] === opt ? '#E7C92F' : '#C8D4E8',
+                  }}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* TIEBREAKER */}
+      <div
+        className="flex items-center justify-between gap-4 flex-wrap"
+        style={{
+          background: 'linear-gradient(180deg,rgba(231,201,47,.08),rgba(231,201,47,.02))',
+          border: '1px solid rgba(231,201,47,.28)',
+          borderRadius: 14,
+          padding: '16px 18px',
+          marginBottom: 26,
+        }}
+      >
+        <div>
+          <div style={{ fontWeight: 900, fontSize: 11, letterSpacing: '.12em', color: '#E7C92F', marginBottom: 3 }}>TIEBREAKER</div>
+          <div style={{ fontWeight: 700, fontSize: 14.5, color: '#C8D4E8' }}>{game.tiebreakerQuestion}</div>
+        </div>
+        <input
+          type="number"
+          placeholder="00"
+          value={tiebreaker}
+          onChange={(e) => setTiebreaker(e.target.value)}
+          style={{
+            width: 96,
+            textAlign: 'center',
+            fontFamily: 'var(--font-display)',
+            fontSize: 22,
+            color: '#fff',
+            background: 'rgba(0,0,0,.3)',
+            border: '1.5px solid rgba(255,255,255,.14)',
+            borderRadius: 10,
+            padding: '8px 10px',
+            outline: 'none',
+          }}
+        />
+      </div>
+
+      <GoldButton full onClick={() => setToastOpen(true)} style={{ opacity: allAnswered ? 1 : 0.6 }}>
+        Lock In Your Picks
+      </GoldButton>
+      <p className="text-center text-muted" style={{ fontSize: 12.5, marginTop: 12 }}>
+        {allAnswered ? 'You can edit your picks until the countdown ends.' : `Answer all ${total} picks + the tiebreaker to lock in.`}
+      </p>
+
+      <Toast
+        open={toastOpen}
+        title="Picks locked in!"
+        message="Your picks are in. Come back when the show starts to watch your Pop Count climb the rankings."
+        onClose={() => setToastOpen(false)}
+      />
+    </section>
+  );
+}
