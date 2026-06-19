@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import type { JoinedGame } from '@/lib/store';
 import { SectionLabel } from '@/components/primitives';
 import { formatEventDate } from '@/lib/format';
+import { GameResultsModal } from '@/components/GameResultsModal';
 
 function ordinal(n: number): string {
   if (n <= 0) return '—';
@@ -26,6 +26,7 @@ const inputStyle = {
 export function PreviousResults({ items }: { items: JoinedGame[] }) {
   const [promo, setPromo] = useState('all');
   const [q, setQ] = useState('');
+  const [openGameId, setOpenGameId] = useState<string | null>(null);
 
   const promotions = useMemo(
     () => [...new Set(items.map((i) => i.game.promotion).filter(Boolean))].sort(),
@@ -74,16 +75,17 @@ export function PreviousResults({ items }: { items: JoinedGame[] }) {
           {filtered.map(({ game, myResult }) => {
             const won = myResult.rank === 1;
             return (
-              <Link
+              <button
                 key={game.id}
-                to={`/app/game/${game.id}`}
-                className="no-underline flex items-center justify-between gap-4 flex-wrap"
+                onClick={() => setOpenGameId(game.id)}
+                className="cursor-pointer flex items-center justify-between gap-4 flex-wrap text-left w-full"
                 style={{
                   background: '#0A1228',
                   border: `1px solid ${won ? 'rgba(231,201,47,.3)' : 'rgba(255,255,255,.07)'}`,
                   borderRadius: 12,
                   padding: '14px 16px',
                   color: 'inherit',
+                  fontFamily: 'inherit',
                 }}
               >
                 <div className="flex items-center gap-3.5 flex-wrap">
@@ -107,11 +109,13 @@ export function PreviousResults({ items }: { items: JoinedGame[] }) {
                     {myResult.popCount} Pops
                   </div>
                 </div>
-              </Link>
+              </button>
             );
           })}
         </div>
       )}
+
+      {openGameId && <GameResultsModal gameId={openGameId} onClose={() => setOpenGameId(null)} />}
     </section>
   );
 }

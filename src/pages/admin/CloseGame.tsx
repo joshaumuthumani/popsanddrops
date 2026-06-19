@@ -32,7 +32,10 @@ export function CloseGame() {
   if (loading) return <p className="text-muted">Loading…</p>;
   if (!game) return <p className="text-muted">That game doesn't exist or you don't have access to it.</p>;
 
+  const closed = game.status === 'CLOSED';
+
   const confirmClose = async () => {
+    if (closed) return;
     if (isFirebaseConfigured && gameId) {
       setBusy(true);
       try {
@@ -99,29 +102,35 @@ export function CloseGame() {
         )}
       </div>
 
-      <button
-        onClick={confirmClose}
-        className="cursor-pointer font-black"
-        style={{
-          width: '100%',
-          fontFamily: 'inherit',
-          border: 'none',
-          background: '#C0392B',
-          color: '#fff',
-          fontSize: 16,
-          padding: 18,
-          borderRadius: 13,
-          boxShadow: '0 10px 30px rgba(192,57,43,.28)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 10,
-          opacity: busy ? 0.6 : 1,
-        }}
-      >
-        <CheckIcon size={18} strokeWidth={2.4} style={{ color: '#fff' }} />
-        {busy ? 'Closing…' : 'Confirm close & send Final Pops'}
-      </button>
+      {closed ? (
+        <p className="text-center text-muted" style={{ fontSize: 13.5, padding: '14px 0' }}>
+          This challenge is already closed — the standings above are final.
+        </p>
+      ) : (
+        <button
+          onClick={confirmClose}
+          className="cursor-pointer font-black"
+          style={{
+            width: '100%',
+            fontFamily: 'inherit',
+            border: 'none',
+            background: '#C0392B',
+            color: '#fff',
+            fontSize: 16,
+            padding: 18,
+            borderRadius: 13,
+            boxShadow: '0 10px 30px rgba(192,57,43,.28)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            opacity: busy ? 0.6 : 1,
+          }}
+        >
+          <CheckIcon size={18} strokeWidth={2.4} style={{ color: '#fff' }} />
+          {busy ? 'Closing…' : 'Confirm close & send Final Pops'}
+        </button>
+      )}
 
       <Toast
         open={toastOpen}

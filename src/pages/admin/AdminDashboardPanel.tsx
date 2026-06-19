@@ -21,6 +21,7 @@ export function AdminDashboardPanel({ game, onEnterLive }: Props) {
   const { playersJoined, submitted } = useAdminStats(game, user);
   const { users } = useUsers();
   const [copied, setCopied] = useState(false);
+  const closed = game.status === 'CLOSED';
   const open = !isLocked(game);
 
   const copyLink = () => {
@@ -58,8 +59,8 @@ export function AdminDashboardPanel({ game, onEnterLive }: Props) {
             <Countdown targetMs={game.lockTime} size="lg" sepColor="#7a3a45" />
           </div>
           <div className="flex items-center gap-2" style={{ background: 'rgba(0,0,0,.25)', borderRadius: 999, padding: '8px 14px' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#E7C92F', boxShadow: '0 0 8px #E7C92F' }} />
-            <span style={{ fontWeight: 800, fontSize: 12.5 }}>{open ? 'Open for picks' : 'Locked'}</span>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: closed ? '#C0392B' : '#E7C92F', boxShadow: `0 0 8px ${closed ? '#C0392B' : '#E7C92F'}` }} />
+            <span style={{ fontWeight: 800, fontSize: 12.5 }}>{closed ? 'Closed · final' : open ? 'Open for picks' : 'Locked'}</span>
           </div>
         </div>
         <Card style={{ padding: 22, borderRadius: 16 }}>
@@ -149,26 +150,30 @@ export function AdminDashboardPanel({ game, onEnterLive }: Props) {
         className="flex items-center justify-between gap-4 flex-wrap"
       >
         <div>
-          <div style={{ fontWeight: 900, fontSize: 16 }}>Ready to run the show?</div>
+          <div style={{ fontWeight: 900, fontSize: 16 }}>{closed ? 'This challenge is final' : 'Ready to run the show?'}</div>
           <div className="text-muted" style={{ fontSize: 13.5 }}>
-            Mark winners match-by-match and the board updates for everyone live.
+            {closed
+              ? 'Results are locked. View the final standings and everyone’s picks.'
+              : 'Mark winners match-by-match and the board updates for everyone live.'}
           </div>
         </div>
         <GoldButton onClick={onEnterLive} style={{ fontSize: 14.5, padding: '14px 22px', borderRadius: 11 }}>
-          Enter live results
+          {closed ? 'View results' : 'Enter live results'}
           <ArrowRightIcon size={16} strokeWidth={2.6} style={{ color: '#1A1408' }} />
         </GoldButton>
       </Card>
 
-      <div className="text-center" style={{ marginTop: 18 }}>
-        <button
-          onClick={() => navigate(`/admin/game/${game.id}/close`)}
-          className="bg-transparent border-0 cursor-pointer underline"
-          style={{ color: '#6B7A99', fontSize: 12.5 }}
-        >
-          Skip to close game &amp; send results →
-        </button>
-      </div>
+      {!closed && (
+        <div className="text-center" style={{ marginTop: 18 }}>
+          <button
+            onClick={() => navigate(`/admin/game/${game.id}/close`)}
+            className="bg-transparent border-0 cursor-pointer underline"
+            style={{ color: '#6B7A99', fontSize: 12.5 }}
+          >
+            Skip to close game &amp; send results →
+          </button>
+        </div>
+      )}
     </section>
   );
 }

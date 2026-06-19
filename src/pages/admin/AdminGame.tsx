@@ -4,11 +4,12 @@ import { Eyebrow, PageTitle } from '@/components/primitives';
 import { SegmentedTabs } from '@/components/SegmentedTabs';
 import { AdminDashboardPanel } from '@/pages/admin/AdminDashboardPanel';
 import { LiveControlPanel } from '@/pages/admin/LiveControlPanel';
+import { PlayersPanel } from '@/pages/admin/PlayersPanel';
 import { useGame } from '@/hooks/data';
 
-type Screen = 'dash' | 'live';
+type Screen = 'dash' | 'live' | 'players';
 
-/** Admin console for one game: Dashboard | Live control tabs (matches the design). */
+/** Admin console for one game: Dashboard | Live control | Players tabs (matches the design). */
 export function AdminGame() {
   const { gameId } = useParams();
   const { game, loading } = useGame(gameId);
@@ -16,6 +17,8 @@ export function AdminGame() {
 
   if (loading) return <p className="text-muted">Loading…</p>;
   if (!game) return <p className="text-muted">That game doesn't exist or you don't have access to it.</p>;
+
+  const closed = game.status === 'CLOSED';
 
   return (
     <div>
@@ -29,18 +32,17 @@ export function AdminGame() {
         <SegmentedTabs<Screen>
           tabs={[
             { value: 'dash', label: 'Dashboard' },
-            { value: 'live', label: 'Live control' },
+            { value: 'live', label: closed ? 'Results' : 'Live control' },
+            { value: 'players', label: 'Players' },
           ]}
           value={screen}
           onChange={setScreen}
         />
       </div>
 
-      {screen === 'dash' ? (
-        <AdminDashboardPanel game={game} onEnterLive={() => setScreen('live')} />
-      ) : (
-        <LiveControlPanel game={game} />
-      )}
+      {screen === 'dash' && <AdminDashboardPanel game={game} onEnterLive={() => setScreen('live')} />}
+      {screen === 'live' && <LiveControlPanel game={game} readOnly={closed} />}
+      {screen === 'players' && <PlayersPanel game={game} />}
     </div>
   );
 }

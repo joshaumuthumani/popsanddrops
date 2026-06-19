@@ -66,9 +66,12 @@ service cloud.firestore {
       allow create: if signedIn()
                     && request.resource.data.createdBy == uid()
                     && uid() in request.resource.data.admins;
-      // Game admins edit the game (details, status transitions, lock time).
+      // Game admins edit the game (details, status transitions, lock time) — but a CLOSED
+      // game is final and cannot be edited further (the close itself is allowed because the
+      // pre-write status is not yet CLOSED).
       allow update: if signedIn()
-                    && (uid() in resource.data.admins || isSuperAdmin());
+                    && (uid() in resource.data.admins || isSuperAdmin())
+                    && resource.data.status != 'CLOSED';
       allow delete: if signedIn()
                     && (resource.data.createdBy == uid() || isSuperAdmin());
 
@@ -88,9 +91,10 @@ service cloud.firestore {
       }
 
       // ---- results/{questionId} : admin-entered correct answers ----
+      // Editable by game admins until the game is CLOSED, after which results are frozen.
       match /results/{questionId} {
         allow read: if signedIn();
-        allow write: if isGameAdmin(gameId);
+        allow write: if isGameAdmin(gameId) && game(gameId).status != 'CLOSED';
       }
 
       // ---- leaderboard/{doc} : denormalized, written ONLY by Cloud Functions ----

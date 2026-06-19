@@ -11,10 +11,12 @@ import { isFirebaseConfigured } from '@/lib/firebase';
 
 interface Props {
   game: Game;
+  /** Closed games are final — results display read-only and can't be changed (PRD §4.6). */
+  readOnly?: boolean;
 }
 
 /** ADMIN · LIVE CONTROL — mark each winner (matches + props); the board updates live. */
-export function LiveControlPanel({ game }: Props) {
+export function LiveControlPanel({ game, readOnly = false }: Props) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const results = useResults(game.id);
@@ -30,7 +32,7 @@ export function LiveControlPanel({ game }: Props) {
   const called = questions.filter((q) => results[q.id] !== undefined && results[q.id] !== '').length;
 
   const mark = (questionId: string, option: string) => {
-    if (!isFirebaseConfigured || !user) return;
+    if (readOnly || !isFirebaseConfigured || !user) return;
     setResult(game.id, questionId, option, user.uid).catch(() => {});
   };
 
@@ -38,8 +40,12 @@ export function LiveControlPanel({ game }: Props) {
     <section>
       <div style={{ marginBottom: 20 }}>
         <LiveBanner
-          title="Show is live — picks are locked"
-          subtitle="Tap the winner of each pick. Every player's board updates within 3 seconds."
+          title={readOnly ? 'Challenge closed — results are final' : 'Show is live — picks are locked'}
+          subtitle={
+            readOnly
+              ? 'This game is closed. Winners are locked and can no longer be changed.'
+              : 'Tap the winner of each pick. Every player’s board updates within 3 seconds.'
+          }
           right={
             <div className="text-right">
               <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', color: '#6B7A99' }}>CALLED</div>
@@ -66,31 +72,39 @@ export function LiveControlPanel({ game }: Props) {
         ))}
       </div>
 
-      <button
-        onClick={() => navigate(`/admin/game/${game.id}/close`)}
-        className="cursor-pointer font-black"
-        style={{
-          width: '100%',
-          fontFamily: 'inherit',
-          border: 'none',
-          background: '#C0392B',
-          color: '#fff',
-          fontSize: 16,
-          padding: 18,
-          borderRadius: 13,
-          boxShadow: '0 10px 30px rgba(192,57,43,.28)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 10,
-        }}
-      >
-        <CheckIcon size={18} strokeWidth={2.4} style={{ color: '#fff' }} />
-        Enter tiebreaker &amp; close game
-      </button>
-      <p className="text-center text-muted" style={{ fontSize: 12.5, marginTop: 12 }}>
-        Next you'll enter the tiebreaker answer, preview the final Pop Rankings, and send results.
-      </p>
+      {readOnly ? (
+        <p className="text-center text-muted" style={{ fontSize: 13, padding: '10px 0' }}>
+          This challenge is final. See <strong style={{ color: '#E7C92F' }}>Players</strong> for everyone’s picks.
+        </p>
+      ) : (
+        <>
+          <button
+            onClick={() => navigate(`/admin/game/${game.id}/close`)}
+            className="cursor-pointer font-black"
+            style={{
+              width: '100%',
+              fontFamily: 'inherit',
+              border: 'none',
+              background: '#C0392B',
+              color: '#fff',
+              fontSize: 16,
+              padding: 18,
+              borderRadius: 13,
+              boxShadow: '0 10px 30px rgba(192,57,43,.28)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+            }}
+          >
+            <CheckIcon size={18} strokeWidth={2.4} style={{ color: '#fff' }} />
+            Enter tiebreaker &amp; close game
+          </button>
+          <p className="text-center text-muted" style={{ fontSize: 12.5, marginTop: 12 }}>
+            Next you'll enter the tiebreaker answer, preview the final Pop Rankings, and send results.
+          </p>
+        </>
+      )}
     </section>
   );
 }
