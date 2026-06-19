@@ -1,0 +1,103 @@
+rules_version = '2';
+
+// Pops & Drops — Firestore Security Rules.
+// Encodes PRD §5 (security) + §11 decisions:
+//   • Any admin on a game (creator or co-admin) can enter results & close it.
+//   • Users can read only THEIR OWN submission before lock; everyone's after lock.
+//   • After lock, late joiners are spectators (read scoreboard, cannot submit).
+// Leaderboard + computed scores are written by Cloud Functions (Admin SDK bypasses
+// these rules), so clients are read-only there.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+
+    function userRole(u) {
+      return get(/databases/$(database)/documents/users/$(u)).data.role;
+    }
+    function isSuperAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(uid()))
+        && userRole(uid()) == 'superadmin';
+    }
+
+    function game(gameId) {
+      return get(/databases/$(database)/documents/games/$(gameId)).data;
+    }
+    // A game is "open for submissions" only in OPEN. DRAFT isn't joinable; any
+    // status past OPEN (LOCKED/CLOSING/CLOSED) means picks are frozen.
+    function gameIsOpen(gameId) {
+      return game(gameId).status == 'OPEN';
+    }
+    // Picks freeze at lockTime by the SERVER clock — independent of stored status, so a
+    // forgotten status flip or a manipulated client clock can't reopen submissions (PRD §5 reliability).
+    function pastLock(gameId) {
+      return request.time.toMillis() >= game(gameId).lockTime;
+    }
+    // Once the game leaves OPEN (by status OR by lock time), all submissions become readable.
+    function gameLocked(gameId) {
+      return game(gameId).status in ['LOCKED', 'CLOSING', 'CLOSED'] || pastLock(gameId);
+    }
+    function isGameAdmin(gameId) {
+      return signedIn() && (uid() in game(gameId).admins || isSuperAdmin());
+    }
+
+    // ---- /users/{u} ----
+    // Profiles are world-readable to signed-in users (leaderboard needs name+photo).
+    // You may create only your own profile, and only with role 'user' (no self-promotion).
+    // You may update your own profile but NOT your own role; only a Super Admin promotes.
+    match /users/{u} {
+      allow read: if signedIn();
+      allow create: if signedIn() && u == uid()
+                    && request.resource.data.role == 'user';
+      allow update: if isSuperAdmin()
+                    || (signedIn() && u == uid()
+                        && request.resource.data.role == resource.data.role);
+      allow delete: if isSuperAdmin();
+    }
+
+    // ---- /games/{gameId} ----
+    match /games/{gameId} {
+      // Any signed-in user can read a game (needed to join by link/code).
+      allow read: if signedIn();
+      // Creator must include themselves in admins and own createdBy.
+      allow create: if signedIn()
+                    && request.resource.data.createdBy == uid()
+                    && uid() in request.resource.data.admins;
+      // Game admins edit the game (details, status transitions, lock time).
+      allow update: if signedIn()
+                    && (uid() in resource.data.admins || isSuperAdmin());
+      allow delete: if signedIn()
+                    && (resource.data.createdBy == uid() || isSuperAdmin());
+
+      // ---- submissions/{u} : one per user per game ----
+      match /submissions/{u} {
+        // Own pick: always readable by you. Others' picks: only after lock,
+        // and to game admins. Spectators see them post-lock like everyone else.
+        allow read: if signedIn()
+                    && (u == uid() || gameLocked(gameId) || isGameAdmin(gameId));
+        // Create/update only your own pick, only while the game is OPEN AND before the
+        // server-clock lock time. Late joiners (post-lock) are blocked here -> spectators.
+        allow create, update: if signedIn() && u == uid()
+                              && request.resource.data.uid == uid()
+                              && gameIsOpen(gameId)
+                              && !pastLock(gameId);
+        allow delete: if false;
+      }
+
+      // ---- results/{questionId} : admin-entered correct answers ----
+      match /results/{questionId} {
+        allow read: if signedIn();
+        allow write: if isGameAdmin(gameId);
+      }
+
+      // ---- leaderboard/{doc} : denormalized, written ONLY by Cloud Functions ----
+      match /leaderboard/{doc} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+  }
+}

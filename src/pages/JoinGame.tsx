@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Card, Eyebrow, PageTitle, GoldButton } from '@/components/primitives';
+import { isFirebaseConfigured } from '@/lib/firebase';
+import { findGameByCode } from '@/lib/store';
 import { MOCK_GAMES } from '@/data/mock';
 
 /** Join via shareable link (/join/:code) or by entering a game code (PRD §5.4). */
@@ -9,14 +11,27 @@ export function JoinGame() {
   const navigate = useNavigate();
   const [code, setCode] = useState(routeCode ?? '');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const join = () => {
-    const game = MOCK_GAMES.find((g) => g.joinCode.toLowerCase() === code.trim().toLowerCase());
-    if (!game) {
-      setError("We couldn't find a game with that code.");
-      return;
+  const join = async () => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    setError('');
+    try {
+      const game = isFirebaseConfigured
+        ? await findGameByCode(trimmed)
+        : MOCK_GAMES.find((g) => g.joinCode.toLowerCase() === trimmed.toLowerCase()) ?? null;
+      if (!game) {
+        setError("We couldn't find a game with that code.");
+        return;
+      }
+      navigate(`/app/game/${game.id}`);
+    } catch {
+      setError('Something went wrong looking up that code. Try again.');
+    } finally {
+      setBusy(false);
     }
-    navigate(`/app/game/${game.id}`);
   };
 
   return (
@@ -47,8 +62,8 @@ export function JoinGame() {
           }}
         />
         {error && <p style={{ color: '#C0392B', fontSize: 13, marginBottom: 12, textAlign: 'center' }}>{error}</p>}
-        <GoldButton full onClick={join}>
-          Join challenge
+        <GoldButton full onClick={join} style={{ opacity: busy ? 0.6 : 1 }}>
+          {busy ? 'Looking…' : 'Join challenge'}
         </GoldButton>
       </Card>
       <p className="text-muted text-center" style={{ fontSize: 12.5, marginTop: 14 }}>

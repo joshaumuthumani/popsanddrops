@@ -1,18 +1,50 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Eyebrow, PageTitle, SectionLabel } from '@/components/primitives';
 import { PopRankingsTable } from '@/components/PopRankingsTable';
 import { Toast } from '@/components/Toast';
 import { CheckIcon } from '@/components/icons';
-import { MOCK_GAMES, MOCK_LEADERBOARD, MOCK_CURRENT_USER } from '@/data/mock';
+import { useAuth } from '@/context/AuthContext';
+import { useGame, useSubmissions, useResults } from '@/hooks/data';
+import { closeGame, leaderboardFrom } from '@/lib/store';
+import { isFirebaseConfigured } from '@/lib/firebase';
+import { MOCK_LEADERBOARD } from '@/data/mock';
 
 /** Close Game — tiebreaker entry + final Pop Rankings preview before sending email (PRD §8.4). */
 export function CloseGame() {
   const { gameId } = useParams();
   const navigate = useNavigate();
-  const game = MOCK_GAMES.find((g) => g.id === gameId) ?? MOCK_GAMES[0];
+  const { user } = useAuth();
+  const { game, loading } = useGame(gameId);
+  const { submissions } = useSubmissions(game, user);
+  const results = useResults(gameId);
   const [tiebreaker, setTiebreaker] = useState('');
   const [toastOpen, setToastOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  // Live preview: rank as if closed, applying the tiebreaker the admin is typing.
+  const preview = useMemo(() => {
+    if (!game) return [];
+    if (!isFirebaseConfigured) return MOCK_LEADERBOARD;
+    return leaderboardFrom({ ...game, tiebreakerAnswer: tiebreaker, status: 'CLOSED' }, submissions, results);
+  }, [game, submissions, results, tiebreaker]);
+
+  if (loading) return <p className="text-muted">Loading…</p>;
+  if (!game) return <p className="text-muted">That game doesn't exist or you don't have access to it.</p>;
+
+  const confirmClose = async () => {
+    if (isFirebaseConfigured && gameId) {
+      setBusy(true);
+      try {
+        await closeGame(gameId, tiebreaker);
+      } catch {
+        setBusy(false);
+        return;
+      }
+      setBusy(false);
+    }
+    setToastOpen(true);
+  };
 
   return (
     <div>
@@ -60,11 +92,15 @@ export function CloseGame() {
 
       <SectionLabel style={{ marginBottom: 12 }}>Final Pop Rankings preview</SectionLabel>
       <div style={{ marginBottom: 22 }}>
-        <PopRankingsTable entries={MOCK_LEADERBOARD} meUid={MOCK_CURRENT_USER.uid} showDrops showTiebreaker />
+        {preview.length === 0 ? (
+          <p className="text-muted" style={{ fontSize: 13 }}>No submissions yet — rankings will appear here.</p>
+        ) : (
+          <PopRankingsTable entries={preview} meUid={user?.uid} showDrops showTiebreaker />
+        )}
       </div>
 
       <button
-        onClick={() => setToastOpen(true)}
+        onClick={confirmClose}
         className="cursor-pointer font-black"
         style={{
           width: '100%',
@@ -80,10 +116,11 @@ export function CloseGame() {
           alignItems: 'center',
           justifyContent: 'center',
           gap: 10,
+          opacity: busy ? 0.6 : 1,
         }}
       >
         <CheckIcon size={18} strokeWidth={2.4} style={{ color: '#fff' }} />
-        Confirm close &amp; send Final Pops
+        {busy ? 'Closing…' : 'Confirm close & send Final Pops'}
       </button>
 
       <Toast

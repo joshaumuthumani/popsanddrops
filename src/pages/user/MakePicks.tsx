@@ -10,19 +10,45 @@ interface Props {
   initialMatchPicks?: Record<string, string>;
   initialPropPicks?: Record<string, string>;
   initialTiebreaker?: string;
+  /** When true, the show has locked — picks are read-only (PRD §4.4). */
+  locked?: boolean;
+  saving?: boolean;
+  onSubmit?: (picks: {
+    matchPicks: Record<string, string>;
+    propBetPicks: Record<string, string>;
+    tiebreakerAnswer: string;
+  }) => void;
 }
 
 /** USER · MAKE PICKS — two sections + tiebreaker, live countdown, "Lock In Your Picks". */
-export function MakePicks({ game, initialMatchPicks = {}, initialPropPicks = {}, initialTiebreaker = '' }: Props) {
+export function MakePicks({
+  game,
+  initialMatchPicks = {},
+  initialPropPicks = {},
+  initialTiebreaker = '',
+  locked = false,
+  saving = false,
+  onSubmit,
+}: Props) {
   const [matchPicks, setMatchPicks] = useState<Record<string, string>>(initialMatchPicks);
   const [propPicks, setPropPicks] = useState<Record<string, string>>(initialPropPicks);
   const [tiebreaker, setTiebreaker] = useState(initialTiebreaker);
   const [toastOpen, setToastOpen] = useState(false);
 
+  const editable = !locked;
+  const setMatch = (id: string, opt: string) => editable && setMatchPicks((p) => ({ ...p, [id]: opt }));
+  const setProp = (id: string, opt: string) => editable && setPropPicks((p) => ({ ...p, [id]: opt }));
+
   const total = game.matches.length + game.propBets.length;
   const made = Object.keys(matchPicks).length + Object.keys(propPicks).length;
   const pct = Math.round((made / total) * 100);
   const allAnswered = made === total && tiebreaker.trim() !== '';
+
+  const submit = () => {
+    if (!allAnswered || saving || !onSubmit) return;
+    onSubmit({ matchPicks, propBetPicks: propPicks, tiebreakerAnswer: tiebreaker });
+    setToastOpen(true);
+  };
 
   const lockLabel = useMemo(() => new Date(game.lockTime).toLocaleString(), [game.lockTime]);
 
@@ -30,8 +56,12 @@ export function MakePicks({ game, initialMatchPicks = {}, initialPropPicks = {},
     <section>
       <div style={{ marginBottom: 22 }}>
         <LiveBanner
-          title="Get your picks in before the bell"
-          subtitle="Submit before the countdown hits zero — picks freeze after that."
+          title={locked ? 'Picks are locked' : 'Get your picks in before the bell'}
+          subtitle={
+            locked
+              ? 'The countdown hit zero — this is a read-only view of your picks.'
+              : 'Submit before the countdown hits zero — picks freeze after that.'
+          }
           right={
             <div className="text-right" title={lockLabel}>
               <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', color: '#6B7A99' }}>LOCKS IN</div>
@@ -92,7 +122,7 @@ export function MakePicks({ game, initialMatchPicks = {}, initialPropPicks = {},
                       key={opt}
                       align="left"
                       selected={matchPicks[m.id] === opt}
-                      onClick={() => setMatchPicks((p) => ({ ...p, [m.id]: opt }))}
+                      onClick={() => setMatch(m.id, opt)}
                     >
                       {opt}
                     </PickButton>
@@ -100,13 +130,13 @@ export function MakePicks({ game, initialMatchPicks = {}, initialPropPicks = {},
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 34px 1fr', gap: 10, alignItems: 'center' }}>
-                  <PickButton selected={matchPicks[m.id] === m.options[0]} onClick={() => setMatchPicks((p) => ({ ...p, [m.id]: m.options[0] }))}>
+                  <PickButton selected={matchPicks[m.id] === m.options[0]} onClick={() => setMatch(m.id, m.options[0])}>
                     {m.options[0]}
                   </PickButton>
                   <span className="text-center" style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: '#6B7A99' }}>
                     VS
                   </span>
-                  <PickButton selected={matchPicks[m.id] === m.options[1]} onClick={() => setMatchPicks((p) => ({ ...p, [m.id]: m.options[1] }))}>
+                  <PickButton selected={matchPicks[m.id] === m.options[1]} onClick={() => setMatch(m.id, m.options[1])}>
                     {m.options[1]}
                   </PickButton>
                 </div>
@@ -126,7 +156,7 @@ export function MakePicks({ game, initialMatchPicks = {}, initialPropPicks = {},
               {p.options.map((opt) => (
                 <button
                   key={opt}
-                  onClick={() => setPropPicks((prev) => ({ ...prev, [p.id]: opt }))}
+                  onClick={() => setProp(p.id, opt)}
                   className="cursor-pointer font-extrabold transition-all duration-200"
                   style={{
                     fontFamily: 'inherit',
@@ -165,7 +195,8 @@ export function MakePicks({ game, initialMatchPicks = {}, initialPropPicks = {},
           type="number"
           placeholder="00"
           value={tiebreaker}
-          onChange={(e) => setTiebreaker(e.target.value)}
+          disabled={locked}
+          onChange={(e) => editable && setTiebreaker(e.target.value)}
           style={{
             width: 96,
             textAlign: 'center',
@@ -181,12 +212,20 @@ export function MakePicks({ game, initialMatchPicks = {}, initialPropPicks = {},
         />
       </div>
 
-      <GoldButton full onClick={() => setToastOpen(true)} style={{ opacity: allAnswered ? 1 : 0.6 }}>
-        Lock In Your Picks
-      </GoldButton>
-      <p className="text-center text-muted" style={{ fontSize: 12.5, marginTop: 12 }}>
-        {allAnswered ? 'You can edit your picks until the countdown ends.' : `Answer all ${total} picks + the tiebreaker to lock in.`}
-      </p>
+      {locked ? (
+        <p className="text-center text-muted" style={{ fontSize: 13, padding: '14px 0' }}>
+          Picks are locked. Head to <strong style={{ color: '#E7C92F' }}>Pop Rankings</strong> to watch the board live.
+        </p>
+      ) : (
+        <>
+          <GoldButton full onClick={submit} style={{ opacity: allAnswered && !saving ? 1 : 0.6 }}>
+            {saving ? 'Locking in…' : 'Lock In Your Picks'}
+          </GoldButton>
+          <p className="text-center text-muted" style={{ fontSize: 12.5, marginTop: 12 }}>
+            {allAnswered ? 'You can edit your picks until the countdown ends.' : `Answer all ${total} picks + the tiebreaker to lock in.`}
+          </p>
+        </>
+      )}
 
       <Toast
         open={toastOpen}

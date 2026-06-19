@@ -4,15 +4,18 @@ import { Eyebrow, PageTitle } from '@/components/primitives';
 import { SegmentedTabs } from '@/components/SegmentedTabs';
 import { AdminDashboardPanel } from '@/pages/admin/AdminDashboardPanel';
 import { LiveControlPanel } from '@/pages/admin/LiveControlPanel';
-import { MOCK_GAMES } from '@/data/mock';
+import { useGame } from '@/hooks/data';
 
 type Screen = 'dash' | 'live';
 
 /** Admin console for one game: Dashboard | Live control tabs (matches the design). */
 export function AdminGame() {
   const { gameId } = useParams();
-  const game = MOCK_GAMES.find((g) => g.id === gameId) ?? MOCK_GAMES[0];
+  const { game, loading } = useGame(gameId);
   const [screen, setScreen] = useState<Screen>('dash');
+
+  if (loading) return <p className="text-muted">Loading…</p>;
+  if (!game) return <p className="text-muted">That game doesn't exist or you don't have access to it.</p>;
 
   return (
     <div>

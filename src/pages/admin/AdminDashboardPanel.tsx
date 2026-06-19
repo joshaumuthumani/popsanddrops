@@ -5,7 +5,11 @@ import { Card, GoldButton, SectionLabel } from '@/components/primitives';
 import { Countdown } from '@/components/Countdown';
 import { Avatar } from '@/components/Avatar';
 import { ArrowRightIcon } from '@/components/icons';
-import { MOCK_ADMIN_STATS } from '@/data/mock';
+import { useAuth } from '@/context/AuthContext';
+import { useAdminStats, useUsers, isLocked } from '@/hooks/data';
+import { addCoAdmin, findUserByEmail } from '@/lib/store';
+import { isFirebaseConfigured } from '@/lib/firebase';
+import { initialsFromName } from '@/lib/format';
 
 interface Props {
   game: Game;
@@ -15,14 +19,43 @@ interface Props {
 /** ADMIN · DASHBOARD — countdown, join code, co-admins, "Enter live results" (design admin-dash). */
 export function AdminDashboardPanel({ game, onEnterLive }: Props) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { playersJoined, submitted } = useAdminStats(game, user);
+  const { users } = useUsers();
   const [copied, setCopied] = useState(false);
-  const open = game.status === 'OPEN';
+  const [coAdminEmail, setCoAdminEmail] = useState('');
+  const [coAdminMsg, setCoAdminMsg] = useState('');
+  const open = !isLocked(game);
 
   const copyLink = () => {
     const link = `${window.location.origin}/join/${game.joinCode}`;
     navigator.clipboard?.writeText(link).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
+  };
+
+  const profileFor = (uid: string) => users.find((u) => u.uid === uid);
+
+  const addAdmin = async () => {
+    const email = coAdminEmail.trim();
+    if (!email) return;
+    if (!isFirebaseConfigured) {
+      setCoAdminMsg('Co-admins activate once Firebase is connected.');
+      return;
+    }
+    setCoAdminMsg('Looking up account…');
+    try {
+      const found = await findUserByEmail(email);
+      if (!found) {
+        setCoAdminMsg('No account with that email yet — they need to sign in once first.');
+        return;
+      }
+      await addCoAdmin(game.id, found.uid);
+      setCoAdminEmail('');
+      setCoAdminMsg(`${found.displayName} is now a co-admin.`);
+    } catch {
+      setCoAdminMsg('Could not add that co-admin. Check the email and try again.');
+    }
   };
 
   return (
@@ -52,18 +85,18 @@ export function AdminDashboardPanel({ game, onEnterLive }: Props) {
           </div>
           <div className="flex items-center gap-2" style={{ background: 'rgba(0,0,0,.25)', borderRadius: 999, padding: '8px 14px' }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#E7C92F', boxShadow: '0 0 8px #E7C92F' }} />
-            <span style={{ fontWeight: 800, fontSize: 12.5 }}>{open ? 'Open for picks' : game.status}</span>
+            <span style={{ fontWeight: 800, fontSize: 12.5 }}>{open ? 'Open for picks' : 'Locked'}</span>
           </div>
         </div>
         <Card style={{ padding: 22, borderRadius: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', color: '#6B7A99' }}>PLAYERS JOINED</div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 48, lineHeight: 1.1 }}>{MOCK_ADMIN_STATS.playersJoined}</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 48, lineHeight: 1.1 }}>{playersJoined}</div>
         </Card>
         <Card style={{ padding: 22, borderRadius: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', color: '#6B7A99' }}>SUBMITTED</div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 48, lineHeight: 1.1 }}>
-            {MOCK_ADMIN_STATS.submitted}
-            <span style={{ fontSize: 18, color: '#6B7A99' }}>/{MOCK_ADMIN_STATS.playersJoined}</span>
+            {submitted}
+            <span style={{ fontSize: 18, color: '#6B7A99' }}>/{playersJoined}</span>
           </div>
         </Card>
       </div>
@@ -111,37 +144,62 @@ export function AdminDashboardPanel({ game, onEnterLive }: Props) {
         <Card style={{ padding: 22, borderRadius: 16 }}>
           <SectionLabel style={{ fontSize: 13, letterSpacing: '.08em', marginBottom: 14 }}>Co-admins</SectionLabel>
           <div className="flex flex-col gap-2.5">
-            <div className="flex items-center gap-2.5">
-              <Avatar initials="JD" highlight size={32} />
-              <div className="flex-1">
-                <div style={{ fontWeight: 800, fontSize: 14 }}>
-                  Jordan D. <span style={{ color: '#E7C92F', fontSize: 11, fontWeight: 800 }}>· you</span>
+            {game.admins.map((uid) => {
+              const p = profileFor(uid);
+              const name = p?.displayName ?? (uid === user?.uid ? user.displayName : 'Admin');
+              const isOwner = uid === game.createdBy;
+              const isYou = uid === user?.uid;
+              return (
+                <div key={uid} className="flex items-center gap-2.5">
+                  <Avatar initials={initialsFromName(name)} highlight={isOwner} size={32} />
+                  <div className="flex-1">
+                    <div style={{ fontWeight: 800, fontSize: 14 }}>
+                      {name}
+                      {isYou && <span style={{ color: '#E7C92F', fontSize: 11, fontWeight: 800 }}> · you</span>}
+                    </div>
+                    <div className="text-muted" style={{ fontSize: 12 }}>{isOwner ? 'Owner' : 'Co-admin'}</div>
+                  </div>
                 </div>
-                <div className="text-muted" style={{ fontSize: 12 }}>Owner</div>
-              </div>
+              );
+            })}
+            <div className="flex items-center gap-2" style={{ marginTop: 2 }}>
+              <input
+                value={coAdminEmail}
+                onChange={(e) => {
+                  setCoAdminEmail(e.target.value);
+                  setCoAdminMsg('');
+                }}
+                placeholder="co-admin@gmail.com"
+                style={{
+                  flex: 1,
+                  background: 'rgba(0,0,0,.3)',
+                  border: '1.5px solid rgba(255,255,255,.12)',
+                  borderRadius: 9,
+                  padding: '9px 11px',
+                  color: '#F5F5F5',
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                  outline: 'none',
+                }}
+              />
+              <button
+                onClick={addAdmin}
+                className="cursor-pointer font-extrabold"
+                style={{
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                  border: '1.5px dashed rgba(231,201,47,.4)',
+                  background: 'transparent',
+                  color: '#E7C92F',
+                  padding: '9px 14px',
+                  borderRadius: 9,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                + Add
+              </button>
             </div>
-            <div className="flex items-center gap-2.5">
-              <Avatar initials="SR" size={32} />
-              <div className="flex-1">
-                <div style={{ fontWeight: 800, fontSize: 14 }}>Steph R.</div>
-                <div className="text-muted" style={{ fontSize: 12 }}>Co-admin</div>
-              </div>
-            </div>
-            <button
-              className="cursor-pointer font-extrabold"
-              style={{
-                fontFamily: 'inherit',
-                fontSize: 13,
-                border: '1.5px dashed rgba(255,255,255,.16)',
-                background: 'transparent',
-                color: '#6B7A99',
-                padding: 10,
-                borderRadius: 10,
-                marginTop: 2,
-              }}
-            >
-              + Add a co-admin
-            </button>
+            {coAdminMsg && <p className="text-muted" style={{ fontSize: 12 }}>{coAdminMsg}</p>}
           </div>
         </Card>
       </div>

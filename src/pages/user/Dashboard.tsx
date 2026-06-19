@@ -3,10 +3,15 @@ import { Eyebrow, PageTitle } from '@/components/primitives';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Countdown } from '@/components/Countdown';
 import { formatEventDate } from '@/lib/format';
-import { MOCK_GAMES } from '@/data/mock';
+import { useAuth } from '@/context/AuthContext';
+import { useUserGames } from '@/hooks/data';
+import { EmptyState } from '@/components/EmptyState';
 
 /** User Dashboard — the games this player has joined, as cards (PRD §8.4). */
 export function UserDashboard() {
+  const { user } = useAuth();
+  const { games, loading } = useUserGames(user);
+
   return (
     <div>
       <div style={{ marginBottom: 22 }}>
@@ -14,8 +19,18 @@ export function UserDashboard() {
         <PageTitle>Your Challenges</PageTitle>
       </div>
 
+      {loading ? (
+        <p className="text-muted">Loading your challenges…</p>
+      ) : games.length === 0 ? (
+        <EmptyState
+          title="No challenges yet"
+          body="Got a join code from your pod's organizer? Enter it to jump into a challenge."
+          ctaLabel="Enter a join code"
+          to="/join"
+        />
+      ) : (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
-        {MOCK_GAMES.map((g) => {
+        {games.map((g) => {
           const open = g.status === 'OPEN';
           return (
             <Link
@@ -60,6 +75,7 @@ export function UserDashboard() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }

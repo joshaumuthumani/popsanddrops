@@ -41,6 +41,8 @@ export interface Game {
   matches: Match[];
   propBets: PropBet[];
   tiebreakerQuestion: string;
+  /** Correct tiebreaker answer, entered by an admin at close time. */
+  tiebreakerAnswer?: string;
   /** Shareable invite code, e.g. "SLAM-4827". */
   joinCode: string;
   /** uids of the owner + co-admins. */
@@ -51,6 +53,9 @@ export interface Game {
 
 export interface Submission {
   uid: string;
+  /** Denormalized from the user's profile so the live board needs no /users reads. */
+  displayName?: string;
+  photoURL?: string | null;
   /** matchId -> chosen option */
   matchPicks: Record<string, string>;
   /** propBetId -> chosen option */

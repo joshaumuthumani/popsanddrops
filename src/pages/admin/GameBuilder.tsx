@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Eyebrow, PageTitle, SectionLabel, GoldButton } from '@/components/primitives';
 import { Toast } from '@/components/Toast';
+import { useAuth } from '@/context/AuthContext';
+import { createGame } from '@/lib/store';
+import { isFirebaseConfigured } from '@/lib/firebase';
 
 interface DraftQuestion {
   id: string;
@@ -105,6 +108,7 @@ function QuestionBuilder({
 /** Game Builder — create/edit a game for any promotion (PRD §5.2). */
 export function GameBuilder() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [name, setName] = useState('');
   const [promotion, setPromotion] = useState('');
   const [eventDate, setEventDate] = useState('');
@@ -113,6 +117,61 @@ export function GameBuilder() {
   const [matches, setMatches] = useState<DraftQuestion[]>([{ id: newId(), label: '', options: ['', ''] }]);
   const [props, setProps] = useState<DraftQuestion[]>([{ id: newId(), label: '', options: ['Yes', 'No'] }]);
   const [toastOpen, setToastOpen] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [newGameId, setNewGameId] = useState<string | null>(null);
+
+  // DraftQuestion -> domain question, dropping blank options/rows.
+  const cleanQuestions = (qs: DraftQuestion[]) =>
+    qs
+      .map((q) => ({ id: q.id, label: q.label.trim(), options: q.options.map((o) => o.trim()).filter(Boolean) }))
+      .filter((q) => q.label && q.options.length >= 2);
+
+  const publish = async () => {
+    setError('');
+    const cleanMatches = cleanQuestions(matches);
+    const cleanProps = cleanQuestions(props);
+    if (!name.trim() || !promotion.trim() || !eventDate || !lockTime || !tiebreaker.trim()) {
+      setError('Fill in the game name, promotion, event date, lock time, and tiebreaker.');
+      return;
+    }
+    if (cleanMatches.length === 0) {
+      setError('Add at least one match with two or more options.');
+      return;
+    }
+    const lockMs = new Date(lockTime).getTime();
+    if (Number.isNaN(lockMs)) {
+      setError('That lock time looks invalid.');
+      return;
+    }
+
+    if (!isFirebaseConfigured || !user) {
+      // Demo mode — no backend; just show the success toast.
+      setToastOpen(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      const id = await createGame(
+        {
+          name,
+          promotion,
+          eventDate,
+          lockTime: lockMs,
+          tiebreakerQuestion: tiebreaker,
+          matches: cleanMatches.map((m) => ({ id: m.id, name: m.label, options: m.options })),
+          propBets: cleanProps.map((p) => ({ id: p.id, question: p.label, options: p.options })),
+        },
+        user,
+      );
+      setNewGameId(id);
+      setToastOpen(true);
+    } catch {
+      setError('Could not publish the game. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div>
@@ -155,9 +214,11 @@ export function GameBuilder() {
         />
       </Card>
 
+      {error && <p style={{ color: '#C0392B', fontSize: 13, marginBottom: 12 }}>{error}</p>}
+
       <div className="flex gap-3 flex-wrap">
-        <GoldButton onClick={() => setToastOpen(true)} style={{ flex: 1, minWidth: 220 }}>
-          Publish game
+        <GoldButton onClick={publish} style={{ flex: 1, minWidth: 220, opacity: busy ? 0.6 : 1 }}>
+          {busy ? 'Publishing…' : 'Publish game'}
         </GoldButton>
         <button
           onClick={() => navigate('/admin')}
@@ -174,7 +235,7 @@ export function GameBuilder() {
         message="Your challenge is live. Share the join code with the pod and the countdown starts ticking."
         onClose={() => {
           setToastOpen(false);
-          navigate('/admin');
+          navigate(newGameId ? `/admin/game/${newGameId}` : '/admin');
         }}
       />
     </div>

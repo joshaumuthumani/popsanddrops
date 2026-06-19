@@ -1,18 +1,46 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Eyebrow, PageTitle } from '@/components/primitives';
 import { SegmentedTabs } from '@/components/SegmentedTabs';
 import { MakePicks } from '@/pages/user/MakePicks';
 import { PopRankings } from '@/pages/user/PopRankings';
-import { MOCK_GAMES, MOCK_MY_SUBMISSION, MOCK_RESULTS, MOCK_LEADERBOARD, MOCK_CURRENT_USER } from '@/data/mock';
+import { useAuth } from '@/context/AuthContext';
+import { useGame, useMySubmission, useResults, useLeaderboard, isLocked } from '@/hooks/data';
+import { saveSubmission, type SubmissionInput } from '@/lib/store';
+import { isFirebaseConfigured } from '@/lib/firebase';
 
 type Screen = 'predict' | 'live';
 
 /** Wraps the two user screens for a single game with the pill tab switcher. */
 export function UserGame() {
   const { gameId } = useParams();
-  const game = MOCK_GAMES.find((g) => g.id === gameId) ?? MOCK_GAMES[0];
+  const { user } = useAuth();
+  const { game, loading } = useGame(gameId);
+  const { submission } = useMySubmission(gameId, user?.uid);
+  const results = useResults(gameId);
+  const leaderboard = useLeaderboard(game, user);
   const [screen, setScreen] = useState<Screen>('predict');
+  const [saving, setSaving] = useState(false);
+
+  const locked = game ? isLocked(game) : false;
+
+  // Once locked there's nothing to submit — land on the live board.
+  useEffect(() => {
+    if (locked) setScreen('live');
+  }, [locked]);
+
+  if (loading) return <p className="text-muted">Loading…</p>;
+  if (!game) return <p className="text-muted">That game doesn't exist or the code was wrong.</p>;
+
+  const handleSubmit = async (picks: SubmissionInput) => {
+    if (!isFirebaseConfigured || !user) return;
+    setSaving(true);
+    try {
+      await saveSubmission(game.id, user, picks);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div>
@@ -36,16 +64,20 @@ export function UserGame() {
       {screen === 'predict' ? (
         <MakePicks
           game={game}
-          initialMatchPicks={MOCK_MY_SUBMISSION.matchPicks}
-          initialTiebreaker={MOCK_MY_SUBMISSION.tiebreakerAnswer}
+          initialMatchPicks={submission?.matchPicks ?? {}}
+          initialPropPicks={submission?.propBetPicks ?? {}}
+          initialTiebreaker={submission?.tiebreakerAnswer ?? ''}
+          locked={locked}
+          saving={saving}
+          onSubmit={handleSubmit}
         />
       ) : (
         <PopRankings
           game={game}
-          submission={MOCK_MY_SUBMISSION}
-          results={MOCK_RESULTS}
-          leaderboard={MOCK_LEADERBOARD}
-          meUid={MOCK_CURRENT_USER.uid}
+          submission={submission}
+          results={results}
+          leaderboard={leaderboard}
+          meUid={user?.uid ?? ''}
         />
       )}
     </div>

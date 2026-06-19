@@ -2,34 +2,49 @@ import type { Game, LeaderboardEntry, Submission } from '@/types';
 import { SectionLabel, StatCard } from '@/components/primitives';
 import { PopDropPill, type GradeState } from '@/components/PopDropPill';
 import { PopRankingsTable } from '@/components/PopRankingsTable';
+import { tally } from '@/lib/scoring';
 
 interface Props {
   game: Game;
-  submission: Submission;
+  submission: Submission | null;
   results: Record<string, string>;
   leaderboard: LeaderboardEntry[];
   meUid: string;
 }
 
 function grade(pick: string | undefined, correct: string | undefined): GradeState {
-  if (correct === undefined) return 'pending';
+  if (correct === undefined || correct === '') return 'pending';
   return pick === correct ? 'pop' : 'drop';
 }
 
 /** USER · LIVE BOARD — Pop Count / rank / graded stat cards, your picks, live Pop Rankings. */
 export function PopRankings({ game, submission, results, leaderboard, meUid }: Props) {
   const totalQuestions = game.matches.length + game.propBets.length;
-  const gradedCount = game.matches.filter((m) => results[m.id] !== undefined).length +
-    game.propBets.filter((p) => results[p.id] !== undefined).length;
+  const gradedCount =
+    game.matches.filter((m) => results[m.id] !== undefined && results[m.id] !== '').length +
+    game.propBets.filter((p) => results[p.id] !== undefined && results[p.id] !== '').length;
 
-  const myRank = leaderboard.find((e) => e.uid === meUid)?.rank ?? submission.rank;
+  const myTally = submission
+    ? tally(game, submission.matchPicks, submission.propBetPicks, results)
+    : null;
+  const myRank = leaderboard.find((e) => e.uid === meUid)?.rank;
+
+  if (!submission) {
+    return (
+      <section>
+        <p className="text-muted" style={{ fontSize: 14 }}>
+          You haven't locked in picks for this challenge yet. Head to <strong style={{ color: '#E7C92F' }}>Make Picks</strong> to get in before the bell.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section>
       {/* stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 14, marginBottom: 24 }}>
-        <StatCard label="POP COUNT" value={submission.popCount} highlight />
-        <StatCard label="YOUR RANK" value={myRank} sub={`/${leaderboard.length}`} />
+        <StatCard label="POP COUNT" value={myTally?.popCount ?? 0} highlight />
+        <StatCard label="YOUR RANK" value={myRank ?? '—'} sub={leaderboard.length ? `/${leaderboard.length}` : undefined} />
         <StatCard label="GRADED" value={gradedCount} sub={`/${totalQuestions}`} />
       </div>
 
@@ -67,7 +82,13 @@ export function PopRankings({ game, submission, results, leaderboard, meUid }: P
         {/* pop rankings */}
         <div>
           <SectionLabel style={{ marginBottom: 12 }}>Pop Rankings</SectionLabel>
-          <PopRankingsTable entries={leaderboard} meUid={meUid} showDrops />
+          {leaderboard.length === 0 ? (
+            <p className="text-muted" style={{ fontSize: 13 }}>
+              Rankings unlock when the show starts and picks lock. Check back at bell time.
+            </p>
+          ) : (
+            <PopRankingsTable entries={leaderboard} meUid={meUid} showDrops />
+          )}
         </div>
       </div>
     </section>

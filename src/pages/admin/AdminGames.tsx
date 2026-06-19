@@ -2,11 +2,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eyebrow, PageTitle, GoldButton } from '@/components/primitives';
 import { StatusBadge } from '@/components/StatusBadge';
 import { formatEventDate } from '@/lib/format';
-import { MOCK_GAMES } from '@/data/mock';
+import { useAuth } from '@/context/AuthContext';
+import { useAdminGames } from '@/hooks/data';
 
 /** Admin Dashboard — list of all games across all promotions + Create New Game (PRD §8.4). */
 export function AdminGames() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { games, loading } = useAdminGames(user);
   return (
     <div>
       <div className="flex items-end justify-between gap-4 flex-wrap" style={{ marginBottom: 22 }}>
@@ -19,8 +22,13 @@ export function AdminGames() {
         </GoldButton>
       </div>
 
+      {loading ? (
+        <p className="text-muted">Loading challenges…</p>
+      ) : games.length === 0 ? (
+        <p className="text-muted">No games yet. Create your first challenge to get the pod predicting.</p>
+      ) : (
       <div className="flex flex-col gap-3">
-        {MOCK_GAMES.map((g) => (
+        {games.map((g) => (
           <Link
             key={g.id}
             to={`/admin/game/${g.id}`}
@@ -48,6 +56,7 @@ export function AdminGames() {
           </Link>
         ))}
       </div>
+      )}
     </div>
   );
 }
