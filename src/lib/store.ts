@@ -84,19 +84,33 @@ export function subscribeAdminGames(uid: string, cb: (games: Game[]) => void): U
   return onSnapshot(q, (snap) => cb(snap.docs.map((d) => normalizeGame(d.id, d.data()))));
 }
 
-/** Games the user has joined — i.e. has a submission in (collection-group query). */
-export async function fetchJoinedGames(uid: string): Promise<Game[]> {
+export interface JoinedGame {
+  game: Game;
+  /** This user's standing in the game (populated once results are graded). */
+  myResult: { popCount: number; dropCount: number; rank: number };
+}
+
+/** Games the user has joined — i.e. has a submission in (collection-group query), with their standing. */
+export async function fetchJoinedGames(uid: string): Promise<JoinedGame[]> {
   const subs = await getDocs(query(collectionGroup(reqDb(), 'submissions'), where('uid', '==', uid)));
-  const gameIds = subs.docs
-    .map((d) => d.ref.parent.parent?.id)
-    .filter((id): id is string => Boolean(id));
-  const games = await Promise.all(
-    [...new Set(gameIds)].map(async (gid) => {
+  const resultByGame = new Map<string, JoinedGame['myResult']>();
+  subs.docs.forEach((d) => {
+    const gid = d.ref.parent.parent?.id;
+    if (!gid) return;
+    const data = d.data();
+    resultByGame.set(gid, {
+      popCount: Number(data.popCount ?? 0),
+      dropCount: Number(data.dropCount ?? 0),
+      rank: Number(data.rank ?? 0),
+    });
+  });
+  const joined = await Promise.all(
+    [...resultByGame.keys()].map(async (gid) => {
       const g = await getDoc(doc(reqDb(), 'games', gid));
-      return g.exists() ? normalizeGame(g.id, g.data()) : null;
+      return g.exists() ? { game: normalizeGame(g.id, g.data()), myResult: resultByGame.get(gid)! } : null;
     }),
   );
-  return games.filter((g): g is Game => g !== null);
+  return joined.filter((j): j is JoinedGame => j !== null);
 }
 
 export async function findGameByCode(code: string): Promise<Game | null> {

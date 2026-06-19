@@ -45,18 +45,18 @@ export function useGame(gameId?: string) {
   return { game, loading };
 }
 
-/** Games shown on the user dashboard: ones they've joined (have a submission in). */
+/** Games shown on the user dashboard: ones they've joined (have a submission in), with standing. */
 export function useUserGames(user: UserProfile | null) {
-  const [games, setGames] = useState<Game[]>([]);
+  const [joined, setJoined] = useState<store.JoinedGame[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     if (!isFirebaseConfigured) {
-      setGames(MOCK_GAMES);
+      setJoined(MOCK_GAMES.map((game) => ({ game, myResult: { popCount: 0, dropCount: 0, rank: 0 } })));
       setLoading(false);
       return;
     }
     if (!user) {
-      setGames([]);
+      setJoined([]);
       setLoading(false);
       return;
     }
@@ -64,13 +64,13 @@ export function useUserGames(user: UserProfile | null) {
     setLoading(true);
     store
       .fetchJoinedGames(user.uid)
-      .then((g) => alive && setGames(g))
+      .then((j) => alive && setJoined(j))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
   }, [user]);
-  return { games, loading };
+  return { joined, loading };
 }
 
 /** Games on the admin dashboard: all (super admin) or ones the admin runs. */
