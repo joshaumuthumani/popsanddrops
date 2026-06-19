@@ -74,20 +74,18 @@ export function AppHeader() {
 
         {/* Right side: nav + account */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {demoMode && (
+          {/* Admins get a real toggle between the participant app and the console. */}
+          {isAdmin && (
             <div
               className="flex items-center gap-1"
               style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.09)', borderRadius: 11, padding: 4 }}
-              title="Demo only — replaced by Google auth + role gating once Firebase is connected"
             >
               <NavLink to="/app" style={({ isActive }) => navPill(isActive)}>
                 <UserIcon size={15} /> User app
               </NavLink>
-              {isAdmin && (
-                <NavLink to="/admin" style={({ isActive }) => navPill(isActive)}>
-                  <ShieldIcon size={15} /> Admin console
-                </NavLink>
-              )}
+              <NavLink to="/admin" style={({ isActive }) => navPill(isActive)}>
+                <ShieldIcon size={15} /> Admin console
+              </NavLink>
             </div>
           )}
           {user && (
