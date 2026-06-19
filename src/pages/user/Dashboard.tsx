@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Eyebrow, PageTitle, SectionLabel } from '@/components/primitives';
+import { PageTitle, SectionLabel } from '@/components/primitives';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Countdown } from '@/components/Countdown';
 import { formatEventDate } from '@/lib/format';
@@ -19,7 +19,6 @@ export function UserDashboard() {
   return (
     <div>
       <div style={{ marginBottom: 22 }}>
-        <Eyebrow>User app · Participant</Eyebrow>
         <PageTitle>Your Challenges</PageTitle>
       </div>
 

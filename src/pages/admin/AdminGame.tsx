@@ -25,7 +25,7 @@ export function AdminGame() {
       <div className="flex items-end justify-between gap-4 flex-wrap" style={{ marginBottom: 22 }}>
         <div>
           <Link to="/admin" className="no-underline">
-            <Eyebrow>Admin console · Organizer</Eyebrow>
+            <Eyebrow>← All challenges</Eyebrow>
           </Link>
           <PageTitle>{game.name}</PageTitle>
         </div>

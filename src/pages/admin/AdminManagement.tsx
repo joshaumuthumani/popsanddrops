@@ -1,4 +1,4 @@
-import { Card, Eyebrow, PageTitle, SectionLabel } from '@/components/primitives';
+import { Card, PageTitle, SectionLabel } from '@/components/primitives';
 import { Avatar } from '@/components/Avatar';
 import type { Role } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -23,7 +23,6 @@ export function AdminManagement() {
   return (
     <div>
       <div style={{ marginBottom: 22 }}>
-        <Eyebrow>Admin console · Super Admin</Eyebrow>
         <PageTitle>Manage Admins</PageTitle>
       </div>
 

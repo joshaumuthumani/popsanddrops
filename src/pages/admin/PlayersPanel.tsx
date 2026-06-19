@@ -44,6 +44,13 @@ export function PlayersPanel({ game }: { game: Game }) {
       <p className="text-muted" style={{ fontSize: 13, marginBottom: 14 }}>
         {submissions.length} {submissions.length === 1 ? 'player has' : 'players have'} submitted. Tap a name to see their picks.
       </p>
+      <div className="flex items-center gap-3" style={{ padding: '0 15px 9px' }}>
+        <span style={{ width: 32 }} />
+        <span className="flex-1" style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', color: '#6B7A99' }}>PLAYER</span>
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', color: '#C0392B', width: 28, textAlign: 'right' }}>DROPS</span>
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', color: '#C8D4E8', width: 28, textAlign: 'right' }}>POPS</span>
+        <span style={{ width: 16 }} />
+      </div>
       <div style={{ background: '#0A1228', border: '1px solid rgba(255,255,255,.07)', borderRadius: 14, overflow: 'hidden' }}>
         {ordered.map((s, i) => {
           const t = tally(game, s.matchPicks, s.propBetPicks, results);

@@ -53,10 +53,16 @@ export function AdminDashboardPanel({ game, onEnterLive }: Props) {
           }}
         >
           <div>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.14em', color: '#F39AAB', marginBottom: 6 }}>
-              SUBMISSIONS LOCK IN
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.14em', color: closed ? '#6B7A99' : '#F39AAB', marginBottom: 6 }}>
+              {closed ? 'SUBMISSIONS CLOSED' : 'SUBMISSIONS LOCK IN'}
             </div>
-            <Countdown targetMs={game.lockTime} size="lg" sepColor="#7a3a45" />
+            {closed ? (
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(40px,6vw,60px)', letterSpacing: '.05em', color: '#3f4a63' }}>
+                00:00:00
+              </span>
+            ) : (
+              <Countdown targetMs={game.lockTime} size="lg" sepColor="#7a3a45" />
+            )}
           </div>
           <div className="flex items-center gap-2" style={{ background: 'rgba(0,0,0,.25)', borderRadius: 999, padding: '8px 14px' }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: closed ? '#C0392B' : '#E7C92F', boxShadow: `0 0 8px ${closed ? '#C0392B' : '#E7C92F'}` }} />
@@ -87,32 +93,37 @@ export function AdminDashboardPanel({ game, onEnterLive }: Props) {
                 fontSize: 26,
                 letterSpacing: '.14em',
                 background: 'rgba(0,0,0,.3)',
-                border: '1.5px dashed rgba(231,201,47,.4)',
+                border: `1.5px dashed ${closed ? 'rgba(255,255,255,.14)' : 'rgba(231,201,47,.4)'}`,
                 borderRadius: 11,
                 padding: '10px 18px',
-                color: '#E7C92F',
+                color: closed ? '#6B7A99' : '#E7C92F',
               }}
             >
               {game.joinCode}
             </div>
             <button
-              onClick={copyLink}
-              className="cursor-pointer font-extrabold transition-all duration-200"
+              onClick={closed ? undefined : copyLink}
+              disabled={closed}
+              className="font-extrabold transition-all duration-200"
               style={{
                 fontFamily: 'inherit',
                 fontSize: 13.5,
-                border: `1.5px solid ${copied ? '#E7C92F' : 'rgba(255,255,255,.16)'}`,
+                border: `1.5px solid ${copied && !closed ? '#E7C92F' : 'rgba(255,255,255,.16)'}`,
                 background: 'transparent',
-                color: copied ? '#E7C92F' : '#F5F5F5',
+                color: closed ? '#6B7A99' : copied ? '#E7C92F' : '#F5F5F5',
                 padding: '12px 18px',
                 borderRadius: 10,
+                cursor: closed ? 'default' : 'pointer',
+                opacity: closed ? 0.7 : 1,
               }}
             >
-              {copied ? 'Copied!' : 'Copy link'}
+              {closed ? 'Link inactive' : copied ? 'Copied!' : 'Copy link'}
             </button>
           </div>
           <p className="text-muted" style={{ fontSize: 13, marginTop: 12, lineHeight: 1.5 }}>
-            Anyone with the code can join and sign in with Google — no manual adds.
+            {closed
+              ? 'This challenge is closed — the join code is no longer active.'
+              : 'Anyone with the code can join and sign in with Google — no manual adds.'}
           </p>
         </Card>
 

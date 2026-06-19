@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Eyebrow, PageTitle, SectionLabel, GoldButton } from '@/components/primitives';
+import { Card, PageTitle, SectionLabel, GoldButton } from '@/components/primitives';
 import { Toast } from '@/components/Toast';
 import { useAuth } from '@/context/AuthContext';
 import { createGame } from '@/lib/store';
@@ -176,7 +176,6 @@ export function GameBuilder() {
   return (
     <div>
       <div style={{ marginBottom: 22 }}>
-        <Eyebrow>Admin console · Organizer</Eyebrow>
         <PageTitle>New Challenge</PageTitle>
       </div>
 

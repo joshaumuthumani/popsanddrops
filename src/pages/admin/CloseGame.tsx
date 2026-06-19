@@ -52,7 +52,7 @@ export function CloseGame() {
   return (
     <div>
       <div style={{ marginBottom: 22 }}>
-        <Eyebrow>Admin console · Close game</Eyebrow>
+        <Eyebrow>Close game</Eyebrow>
         <PageTitle>{game.name}</PageTitle>
       </div>
 

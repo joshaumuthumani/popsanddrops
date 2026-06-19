@@ -47,7 +47,7 @@ export function UserGame() {
       <div className="flex items-end justify-between gap-4 flex-wrap" style={{ marginBottom: 22 }}>
         <div>
           <Link to="/app" className="no-underline">
-            <Eyebrow>User app · Participant</Eyebrow>
+            <Eyebrow>← Your challenges</Eyebrow>
           </Link>
           <PageTitle>{game.name}</PageTitle>
         </div>

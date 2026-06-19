@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Eyebrow, PageTitle, GoldButton } from '@/components/primitives';
+import { PageTitle, GoldButton } from '@/components/primitives';
 import { StatusBadge } from '@/components/StatusBadge';
 import { formatEventDate } from '@/lib/format';
 import { useAuth } from '@/context/AuthContext';
@@ -14,7 +14,6 @@ export function AdminGames() {
     <div>
       <div className="flex items-end justify-between gap-4 flex-wrap" style={{ marginBottom: 22 }}>
         <div>
-          <Eyebrow>Admin console · Organizer</Eyebrow>
           <PageTitle>All Challenges</PageTitle>
         </div>
         <div className="flex items-center gap-2.5 flex-wrap">
