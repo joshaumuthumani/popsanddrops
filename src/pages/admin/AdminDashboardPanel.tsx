@@ -7,8 +7,6 @@ import { Avatar } from '@/components/Avatar';
 import { ArrowRightIcon } from '@/components/icons';
 import { useAuth } from '@/context/AuthContext';
 import { useAdminStats, useUsers, isLocked } from '@/hooks/data';
-import { addCoAdmin, findUserByEmail } from '@/lib/store';
-import { isFirebaseConfigured } from '@/lib/firebase';
 import { initialsFromName } from '@/lib/format';
 
 interface Props {
@@ -23,8 +21,6 @@ export function AdminDashboardPanel({ game, onEnterLive }: Props) {
   const { playersJoined, submitted } = useAdminStats(game, user);
   const { users } = useUsers();
   const [copied, setCopied] = useState(false);
-  const [coAdminEmail, setCoAdminEmail] = useState('');
-  const [coAdminMsg, setCoAdminMsg] = useState('');
   const open = !isLocked(game);
 
   const copyLink = () => {
@@ -35,28 +31,6 @@ export function AdminDashboardPanel({ game, onEnterLive }: Props) {
   };
 
   const profileFor = (uid: string) => users.find((u) => u.uid === uid);
-
-  const addAdmin = async () => {
-    const email = coAdminEmail.trim();
-    if (!email) return;
-    if (!isFirebaseConfigured) {
-      setCoAdminMsg('Co-admins activate once Firebase is connected.');
-      return;
-    }
-    setCoAdminMsg('Looking up account…');
-    try {
-      const found = await findUserByEmail(email);
-      if (!found) {
-        setCoAdminMsg('No account with that email yet — they need to sign in once first.');
-        return;
-      }
-      await addCoAdmin(game.id, found.uid);
-      setCoAdminEmail('');
-      setCoAdminMsg(`${found.displayName} is now a co-admin.`);
-    } catch {
-      setCoAdminMsg('Could not add that co-admin. Check the email and try again.');
-    }
-  };
 
   return (
     <section>
@@ -142,7 +116,7 @@ export function AdminDashboardPanel({ game, onEnterLive }: Props) {
         </Card>
 
         <Card style={{ padding: 22, borderRadius: 16 }}>
-          <SectionLabel style={{ fontSize: 13, letterSpacing: '.08em', marginBottom: 14 }}>Co-admins</SectionLabel>
+          <SectionLabel style={{ fontSize: 13, letterSpacing: '.08em', marginBottom: 14 }}>Organizer</SectionLabel>
           <div className="flex flex-col gap-2.5">
             {game.admins.map((uid) => {
               const p = profileFor(uid);
@@ -157,50 +131,15 @@ export function AdminDashboardPanel({ game, onEnterLive }: Props) {
                       {name}
                       {isYou && <span style={{ color: '#E7C92F', fontSize: 11, fontWeight: 800 }}> · you</span>}
                     </div>
-                    <div className="text-muted" style={{ fontSize: 12 }}>{isOwner ? 'Owner' : 'Co-admin'}</div>
+                    <div className="text-muted" style={{ fontSize: 12 }}>{isOwner ? 'Owner' : 'Admin'}</div>
                   </div>
                 </div>
               );
             })}
-            <div className="flex items-center gap-2" style={{ marginTop: 2 }}>
-              <input
-                value={coAdminEmail}
-                onChange={(e) => {
-                  setCoAdminEmail(e.target.value);
-                  setCoAdminMsg('');
-                }}
-                placeholder="co-admin@gmail.com"
-                style={{
-                  flex: 1,
-                  background: 'rgba(0,0,0,.3)',
-                  border: '1.5px solid rgba(255,255,255,.12)',
-                  borderRadius: 9,
-                  padding: '9px 11px',
-                  color: '#F5F5F5',
-                  fontFamily: 'inherit',
-                  fontSize: 13,
-                  outline: 'none',
-                }}
-              />
-              <button
-                onClick={addAdmin}
-                className="cursor-pointer font-extrabold"
-                style={{
-                  fontFamily: 'inherit',
-                  fontSize: 13,
-                  border: '1.5px dashed rgba(231,201,47,.4)',
-                  background: 'transparent',
-                  color: '#E7C92F',
-                  padding: '9px 14px',
-                  borderRadius: 9,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                + Add
-              </button>
-            </div>
-            {coAdminMsg && <p className="text-muted" style={{ fontSize: 12 }}>{coAdminMsg}</p>}
           </div>
+          <p className="text-muted" style={{ fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>
+            Admins are granted from <strong style={{ color: '#C8D4E8' }}>Manage Admins</strong>. Super Admins can run every game.
+          </p>
         </Card>
       </div>
 

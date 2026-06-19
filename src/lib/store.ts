@@ -146,15 +146,6 @@ export async function createGame(input: NewGameInput, creator: UserProfile): Pro
   return ref.id;
 }
 
-/** Adds a co-admin by uid (the resolved Google account). */
-export async function addCoAdmin(gameId: string, uid: string): Promise<void> {
-  const ref = doc(reqDb(), 'games', gameId);
-  const snap = await getDoc(ref);
-  const admins = ((snap.data()?.admins as string[]) ?? []).slice();
-  if (!admins.includes(uid)) admins.push(uid);
-  await updateDoc(ref, { admins });
-}
-
 // ---------- submissions ----------
 
 export function subscribeMySubmission(
@@ -262,23 +253,6 @@ export function subscribeUsers(cb: (users: UserProfile[]) => void): Unsub {
 
 export async function setUserRole(uid: string, role: Role): Promise<void> {
   await updateDoc(doc(reqDb(), 'users', uid), { role });
-}
-
-/** Resolves a Google account by email to add as a co-admin. Returns null if they've never signed in. */
-export async function findUserByEmail(email: string): Promise<UserProfile | null> {
-  const q = query(collection(reqDb(), 'users'), where('email', '==', email.trim().toLowerCase()), limit(1));
-  const snap = await getDocs(q);
-  const d = snap.docs[0];
-  if (!d) return null;
-  const data = d.data();
-  return {
-    uid: d.id,
-    displayName: (data.displayName as string) ?? 'Player',
-    email: (data.email as string) ?? '',
-    photoURL: (data.photoURL as string | null) ?? null,
-    role: (data.role as Role) ?? 'user',
-    createdAt: Number(data.createdAt ?? 0),
-  };
 }
 
 // ---------- composed leaderboard ----------
