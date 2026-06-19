@@ -71,7 +71,7 @@ async function sendResultsEmail(
   game: GameDoc & { name?: string; eventDate?: string },
 ): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM ?? 'Pops & Drops <onboarding@resend.dev>';
+  const from = process.env.RESEND_FROM ?? 'Pops & Drops <noreply@popsanddrops.us>';
   const appUrl = process.env.APP_PUBLIC_URL ?? 'https://popsanddrops.web.app';
 
   const boardSnap = await db.doc(`games/${gameId}/leaderboard/current`).get();
@@ -99,6 +99,9 @@ async function sendResultsEmail(
       ${winner ? `<p>🏆 <strong>${escapeHtml(winner.displayName)}</strong> takes it with ${winner.popCount} Pops. Congrats!</p>` : ''}
       <table style="border-collapse:collapse">${top3Html}</table>
       <p><a href="${scoreboardLink}">View the full Pop Rankings →</a></p>
+      <p style="color:#8a8a8a;font-size:12px;margin-top:28px;border-top:1px solid #e5e5e5;padding-top:12px">
+        This is an automated message from Pops & Drops — please do not reply, this inbox is not monitored.
+      </p>
     </div>`;
 
   // Look up each participant's email and send. Failures are logged for admin visibility (PRD §4.7).
