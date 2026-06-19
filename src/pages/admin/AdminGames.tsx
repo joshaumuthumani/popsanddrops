@@ -17,9 +17,26 @@ export function AdminGames() {
           <Eyebrow>Admin console · Organizer</Eyebrow>
           <PageTitle>All Challenges</PageTitle>
         </div>
-        <GoldButton onClick={() => navigate('/admin/new')} style={{ fontSize: 14.5, padding: '14px 22px', borderRadius: 11 }}>
-          + Create new game
-        </GoldButton>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {user?.role === 'superadmin' && (
+            <Link
+              to="/admin/manage"
+              className="no-underline font-extrabold"
+              style={{
+                fontSize: 14,
+                padding: '13px 18px',
+                borderRadius: 11,
+                border: '1.5px solid rgba(255,255,255,.16)',
+                color: '#F5F5F5',
+              }}
+            >
+              Manage admins
+            </Link>
+          )}
+          <GoldButton onClick={() => navigate('/admin/new')} style={{ fontSize: 14.5, padding: '14px 22px', borderRadius: 11 }}>
+            + Create new game
+          </GoldButton>
+        </div>
       </div>
 
       {loading ? (
