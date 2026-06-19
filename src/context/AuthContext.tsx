@@ -5,7 +5,7 @@ import {
   signInWithPopup,
   signOut as fbSignOut,
 } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider, isFirebaseConfigured } from '@/lib/firebase';
 import type { Role, UserProfile } from '@/types';
 import { MOCK_CURRENT_USER } from '@/data/mock';
@@ -28,37 +28,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   // ----- Real Firebase auth -----
+  // We SUBSCRIBE to the user's profile (not a one-shot read) so role changes — e.g. a
+  // Super Admin promotion — take effect live, without a refresh.
   useEffect(() => {
     if (!isFirebaseConfigured || !auth || !db) {
       setLoading(false);
       return;
     }
-    const unsub = onAuthStateChanged(auth, async (fbUser) => {
+    let unsubDoc: (() => void) | undefined;
+    const unsubAuth = onAuthStateChanged(auth, (fbUser) => {
+      unsubDoc?.();
+      unsubDoc = undefined;
       if (!fbUser) {
         setUser(null);
         setLoading(false);
         return;
       }
-      // On first login, create the profile (PRD §5.1).
       const ref = doc(db!, 'users', fbUser.uid);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) {
-        const profile = {
-          uid: fbUser.uid,
-          displayName: fbUser.displayName ?? 'Player',
-          email: fbUser.email ?? '',
-          photoURL: fbUser.photoURL ?? null,
-          role: 'user' as Role,
-          createdAt: serverTimestamp(),
-        };
-        await setDoc(ref, profile);
-        setUser({ ...profile, createdAt: Date.now() });
-      } else {
-        setUser({ uid: fbUser.uid, ...(snap.data() as Omit<UserProfile, 'uid'>) });
-      }
-      setLoading(false);
+      unsubDoc = onSnapshot(ref, (snap) => {
+        if (!snap.exists()) {
+          // On first login, create the profile (PRD §5.1). The listener re-fires with it.
+          const profile = {
+            uid: fbUser.uid,
+            displayName: fbUser.displayName ?? 'Player',
+            email: (fbUser.email ?? '').toLowerCase(),
+            photoURL: fbUser.photoURL ?? null,
+            role: 'user' as Role,
+            createdAt: serverTimestamp(),
+          };
+          setDoc(ref, profile).catch(() => {});
+          setUser({ ...profile, createdAt: Date.now() });
+        } else {
+          const data = snap.data() as Record<string, unknown>;
+          setUser({
+            uid: fbUser.uid,
+            displayName: (data.displayName as string) ?? 'Player',
+            email: (data.email as string) ?? '',
+            photoURL: (data.photoURL as string | null) ?? null,
+            role: (data.role as Role) ?? 'user',
+            createdAt:
+              typeof (data.createdAt as { toMillis?: () => number })?.toMillis === 'function'
+                ? (data.createdAt as { toMillis: () => number }).toMillis()
+                : Number(data.createdAt ?? Date.now()),
+          });
+        }
+        setLoading(false);
+      });
     });
-    return unsub;
+    return () => {
+      unsubDoc?.();
+      unsubAuth();
+    };
   }, []);
 
   const signIn = useCallback(async () => {
