@@ -15,6 +15,8 @@ interface AuthContextValue {
   loading: boolean;
   /** True when running on mock data (no Firebase keys yet). */
   demoMode: boolean;
+  /** Last sign-in error (code/message), surfaced on the login screen. */
+  authError: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   /** Demo-only: preview a different role without real auth. No-op in production. */
@@ -26,6 +28,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // ----- Real Firebase auth -----
   // We SUBSCRIBE to the user's profile (not a one-shot read) so role changes — e.g. a
@@ -87,7 +90,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(MOCK_CURRENT_USER);
       return;
     }
-    await signInWithPopup(auth, googleProvider ?? new GoogleAuthProvider());
+    setAuthError(null);
+    try {
+      await signInWithPopup(auth, googleProvider ?? new GoogleAuthProvider());
+    } catch (e) {
+      const err = e as { code?: string; message?: string };
+      // Ignore the benign "user closed the popup" case; surface everything else.
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
+      setAuthError(err.code ?? err.message ?? 'Sign-in failed');
+    }
   }, []);
 
   const signOut = useCallback(async () => {
@@ -104,8 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, demoMode: !isFirebaseConfigured, signIn, signOut, setDemoRole }),
-    [user, loading, signIn, signOut, setDemoRole],
+    () => ({ user, loading, demoMode: !isFirebaseConfigured, authError, signIn, signOut, setDemoRole }),
+    [user, loading, authError, signIn, signOut, setDemoRole],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

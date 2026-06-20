@@ -5,7 +5,7 @@ import { ChevronMark, GoogleIcon } from '@/components/icons';
 
 /** Login / Landing — CodWrestlePod badge, app mark, Google Sign-In only (PRD §8.4). */
 export function Login() {
-  const { user, signIn, demoMode } = useAuth();
+  const { user, signIn, demoMode, authError } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -62,6 +62,12 @@ export function Login() {
           <GoogleIcon size={20} />
           Sign in with Google
         </button>
+
+        {authError && (
+          <p style={{ color: '#C0392B', fontSize: 12.5, marginTop: 14 }}>
+            Sign-in failed: {authError}. Try again, or let us know if it persists.
+          </p>
+        )}
 
         <p className="text-muted" style={{ fontSize: 12, marginTop: 16 }}>
           {demoMode
