@@ -49,6 +49,24 @@ input {
   font-family: inherit;
 }
 
+/* Native date/time pickers default to a dark calendar icon + light popup, invisible on
+   our dark inputs. color-scheme:dark themes the whole native control for dark UI — light
+   icon, light value text, dark calendar popup. */
+input[type='date'],
+input[type='datetime-local'] {
+  color-scheme: dark;
+}
+input[type='date']::-webkit-calendar-picker-indicator,
+input[type='datetime-local']::-webkit-calendar-picker-indicator {
+  opacity: 0.8;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+input[type='date']::-webkit-calendar-picker-indicator:hover,
+input[type='datetime-local']::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
 /* Prototype animations */
 @keyframes ple-pulse {
   0%,
