@@ -17,8 +17,16 @@ function grade(pick: string | undefined, correct: string | undefined): GradeStat
   return pick === correct ? 'pop' : 'drop';
 }
 
-/** USER · LIVE BOARD — Pop Count / rank / graded stat cards, your picks, live Pop Rankings.
- *  Spectators (no submission) still see the live board. */
+const colHeader = {
+  fontSize: 10.5,
+  fontWeight: 800,
+  letterSpacing: '.14em',
+  color: '#77E0E8',
+  marginBottom: 10,
+} as const;
+
+/** USER · LIVE BOARD — Pop Count / rank / graded stat cards, your picks (matches | props),
+ *  live Pop Rankings. Spectators (no submission) still see the board. */
 export function PopRankings({ game, submission, results, leaderboard, meUid }: Props) {
   const totalQuestions = game.matches.length + game.propBets.length;
   const gradedCount =
@@ -30,22 +38,28 @@ export function PopRankings({ game, submission, results, leaderboard, meUid }: P
     : null;
   const myRank = leaderboard.find((e) => e.uid === meUid)?.rank;
 
-  // Your picks = matches AND prop bets, in the same order the game lists them.
-  const myQuestions = submission
-    ? [
-        ...game.matches.map((m) => ({ id: m.id, name: m.name, pick: submission.matchPicks[m.id] })),
-        ...game.propBets.map((p) => ({ id: p.id, name: p.question, pick: submission.propBetPicks[p.id] })),
-      ]
-    : [];
-
-  const board =
-    leaderboard.length === 0 ? (
-      <p className="text-muted" style={{ fontSize: 13 }}>
-        Rankings unlock when the show starts and picks lock. Check back at bell time.
-      </p>
-    ) : (
-      <PopRankingsTable entries={leaderboard} meUid={meUid} showDrops />
+  const pickRow = (id: string, name: string, pick: string | undefined) => {
+    const state = grade(pick, results[id]);
+    const popped = state === 'pop';
+    return (
+      <div
+        key={id}
+        className="flex items-center justify-between"
+        style={{
+          background: popped ? 'rgba(231,201,47,.1)' : 'rgba(255,255,255,.03)',
+          border: `1px solid ${popped ? 'rgba(231,201,47,.3)' : 'rgba(255,255,255,.06)'}`,
+          borderRadius: 12,
+          padding: '13px 15px',
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: '#6B7A99' }}>{name}</div>
+          <div style={{ fontWeight: 800, fontSize: 14.5 }}>{pick ?? '—'}</div>
+        </div>
+        <PopDropPill state={state} />
+      </div>
     );
+  };
 
   return (
     <section>
@@ -61,41 +75,39 @@ export function PopRankings({ game, submission, results, leaderboard, meUid }: P
         </p>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 18 }}>
-        {submission && (
-          <div>
-            <SectionLabel style={{ marginBottom: 12 }}>Your picks</SectionLabel>
-            <div className="flex flex-col gap-2.5">
-              {myQuestions.map((q) => {
-                const state = grade(q.pick, results[q.id]);
-                const popped = state === 'pop';
-                return (
-                  <div
-                    key={q.id}
-                    className="flex items-center justify-between"
-                    style={{
-                      background: popped ? 'rgba(231,201,47,.1)' : 'rgba(255,255,255,.03)',
-                      border: `1px solid ${popped ? 'rgba(231,201,47,.3)' : 'rgba(255,255,255,.06)'}`,
-                      borderRadius: 12,
-                      padding: '13px 15px',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: '#6B7A99' }}>{q.name}</div>
-                      <div style={{ fontWeight: 800, fontSize: 14.5 }}>{q.pick ?? '—'}</div>
-                    </div>
-                    <PopDropPill state={state} />
-                  </div>
-                );
-              })}
-            </div>
+      {submission && (
+        <div style={{ marginBottom: 26 }}>
+          <SectionLabel style={{ marginBottom: 14 }}>Your picks</SectionLabel>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 18 }}>
+            {game.matches.length > 0 && (
+              <div>
+                <div className="uppercase" style={colHeader}>Matches</div>
+                <div className="flex flex-col gap-2.5">
+                  {game.matches.map((m) => pickRow(m.id, m.name, submission.matchPicks[m.id]))}
+                </div>
+              </div>
+            )}
+            {game.propBets.length > 0 && (
+              <div>
+                <div className="uppercase" style={colHeader}>Prop bets</div>
+                <div className="flex flex-col gap-2.5">
+                  {game.propBets.map((p) => pickRow(p.id, p.question, submission.propBetPicks[p.id]))}
+                </div>
+              </div>
+            )}
           </div>
-        )}
-
-        <div>
-          <SectionLabel style={{ marginBottom: 12 }}>Pop Rankings</SectionLabel>
-          {board}
         </div>
+      )}
+
+      <div>
+        <SectionLabel style={{ marginBottom: 12 }}>Pop Rankings</SectionLabel>
+        {leaderboard.length === 0 ? (
+          <p className="text-muted" style={{ fontSize: 13 }}>
+            Rankings unlock when the show starts and picks lock. Check back at bell time.
+          </p>
+        ) : (
+          <PopRankingsTable entries={leaderboard} meUid={meUid} showDrops />
+        )}
       </div>
     </section>
   );
