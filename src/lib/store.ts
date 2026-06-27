@@ -78,12 +78,6 @@ export function subscribeAllGames(cb: (games: Game[]) => void): Unsub {
   );
 }
 
-/** Games this uid administers (creator or co-admin). */
-export function subscribeAdminGames(uid: string, cb: (games: Game[]) => void): Unsub {
-  const q = query(collection(reqDb(), 'games'), where('admins', 'array-contains', uid));
-  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => normalizeGame(d.id, d.data()))));
-}
-
 export interface JoinedGame {
   game: Game;
   /** This user's standing in the game (populated once results are graded). */

@@ -18,9 +18,9 @@ export function isLocked(game: Pick<Game, 'lockTime' | 'status'>): boolean {
   return Date.now() >= game.lockTime || ['LOCKED', 'CLOSING', 'CLOSED'].includes(game.status);
 }
 
-export function isGameAdmin(game: Game | null, user: UserProfile | null): boolean {
-  if (!game || !user) return false;
-  return user.role === 'superadmin' || game.admins.includes(user.uid);
+/** Shared-admin model: any admin (or super admin) can manage any game. */
+export function isAdminUser(user: UserProfile | null): boolean {
+  return user?.role === 'admin' || user?.role === 'superadmin';
 }
 
 export function useGame(gameId?: string) {
@@ -73,7 +73,7 @@ export function useUserGames(user: UserProfile | null) {
   return { joined, loading };
 }
 
-/** Games on the admin dashboard: all (super admin) or ones the admin runs. */
+/** Games on the admin dashboard: every game (any admin sees all — shared-admin model). */
 export function useAdminGames(user: UserProfile | null) {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,13 +89,11 @@ export function useAdminGames(user: UserProfile | null) {
       return;
     }
     setLoading(true);
-    const cb = (g: Game[]) => {
+    // Shared-admin model: every admin (and super admin) sees ALL games.
+    return store.subscribeAllGames((g) => {
       setGames(g);
       setLoading(false);
-    };
-    return user.role === 'superadmin'
-      ? store.subscribeAllGames(cb)
-      : store.subscribeAdminGames(user.uid, cb);
+    });
   }, [user]);
   return { games, loading };
 }
@@ -138,7 +136,7 @@ export function useResults(gameId?: string) {
 /** All submissions — only readable by admins, or by anyone once the game is locked. */
 export function useSubmissions(game: Game | null, user: UserProfile | null) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const canRead = game ? isGameAdmin(game, user) || isLocked(game) : false;
+  const canRead = game ? isAdminUser(user) || isLocked(game) : false;
   useEffect(() => {
     if (!isFirebaseConfigured) {
       setSubmissions([]);

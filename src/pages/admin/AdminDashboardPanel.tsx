@@ -129,28 +129,25 @@ export function AdminDashboardPanel({ game, onEnterLive }: Props) {
 
         <Card style={{ padding: 22, borderRadius: 16 }}>
           <SectionLabel style={{ fontSize: 13, letterSpacing: '.08em', marginBottom: 14 }}>Organizer</SectionLabel>
-          <div className="flex flex-col gap-2.5">
-            {game.admins.map((uid) => {
-              const p = profileFor(uid);
-              const name = p?.displayName ?? (uid === user?.uid ? user.displayName : 'Admin');
-              const isOwner = uid === game.createdBy;
-              const isYou = uid === user?.uid;
-              return (
-                <div key={uid} className="flex items-center gap-2.5">
-                  <Avatar initials={initialsFromName(name)} highlight={isOwner} size={32} />
-                  <div className="flex-1">
-                    <div style={{ fontWeight: 800, fontSize: 14 }}>
-                      {name}
-                      {isYou && <span style={{ color: '#E7C92F', fontSize: 11, fontWeight: 800 }}> · you</span>}
-                    </div>
-                    <div className="text-muted" style={{ fontSize: 12 }}>{isOwner ? 'Owner' : 'Admin'}</div>
+          {(() => {
+            const creator = profileFor(game.createdBy);
+            const isYou = game.createdBy === user?.uid;
+            const name = creator?.displayName ?? (isYou ? user?.displayName ?? 'You' : 'Admin');
+            return (
+              <div className="flex items-center gap-2.5">
+                <Avatar initials={initialsFromName(name)} highlight size={32} />
+                <div className="flex-1">
+                  <div style={{ fontWeight: 800, fontSize: 14 }}>
+                    {name}
+                    {isYou && <span style={{ color: '#E7C92F', fontSize: 11, fontWeight: 800 }}> · you</span>}
                   </div>
+                  <div className="text-muted" style={{ fontSize: 12 }}>Created this game</div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })()}
           <p className="text-muted" style={{ fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>
-            Admins are granted from <strong style={{ color: '#C8D4E8' }}>Manage Admins</strong>. Super Admins can run every game.
+            Any admin can manage this game. Admins are granted from <strong style={{ color: '#C8D4E8' }}>Manage Admins</strong>.
           </p>
         </Card>
       </div>
