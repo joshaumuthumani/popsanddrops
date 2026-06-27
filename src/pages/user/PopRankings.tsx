@@ -30,6 +30,14 @@ export function PopRankings({ game, submission, results, leaderboard, meUid }: P
     : null;
   const myRank = leaderboard.find((e) => e.uid === meUid)?.rank;
 
+  // Your picks = matches AND prop bets, in the same order the game lists them.
+  const myQuestions = submission
+    ? [
+        ...game.matches.map((m) => ({ id: m.id, name: m.name, pick: submission.matchPicks[m.id] })),
+        ...game.propBets.map((p) => ({ id: p.id, name: p.question, pick: submission.propBetPicks[p.id] })),
+      ]
+    : [];
+
   const board =
     leaderboard.length === 0 ? (
       <p className="text-muted" style={{ fontSize: 13 }}>
@@ -58,13 +66,12 @@ export function PopRankings({ game, submission, results, leaderboard, meUid }: P
           <div>
             <SectionLabel style={{ marginBottom: 12 }}>Your picks</SectionLabel>
             <div className="flex flex-col gap-2.5">
-              {game.matches.map((m) => {
-                const pick = submission.matchPicks[m.id];
-                const state = grade(pick, results[m.id]);
+              {myQuestions.map((q) => {
+                const state = grade(q.pick, results[q.id]);
                 const popped = state === 'pop';
                 return (
                   <div
-                    key={m.id}
+                    key={q.id}
                     className="flex items-center justify-between"
                     style={{
                       background: popped ? 'rgba(231,201,47,.1)' : 'rgba(255,255,255,.03)',
@@ -74,8 +81,8 @@ export function PopRankings({ game, submission, results, leaderboard, meUid }: P
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: '#6B7A99' }}>{m.name}</div>
-                      <div style={{ fontWeight: 800, fontSize: 14.5 }}>{pick ?? '—'}</div>
+                      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: '#6B7A99' }}>{q.name}</div>
+                      <div style={{ fontWeight: 800, fontSize: 14.5 }}>{q.pick ?? '—'}</div>
                     </div>
                     <PopDropPill state={state} />
                   </div>
