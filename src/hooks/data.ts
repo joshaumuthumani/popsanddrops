@@ -65,6 +65,7 @@ export function useUserGames(user: UserProfile | null) {
     store
       .fetchJoinedGames(user.uid)
       .then((j) => alive && setJoined(j))
+      .catch((e) => console.error('[useUserGames] failed to load joined games', e))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;

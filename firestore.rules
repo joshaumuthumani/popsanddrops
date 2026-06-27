@@ -81,10 +81,14 @@ service cloud.firestore {
 
       // ---- submissions/{u} : one per user per game ----
       match /submissions/{u} {
-        // Own pick: always readable by you. Others' picks: only after lock,
-        // and to game admins. Spectators see them post-lock like everyone else.
+        // Own pick: always readable by you — by doc-id for a direct get, and by the `uid`
+        // field so the dashboard's collection-group query (submissions where uid == me) is
+        // authorized. Others' picks: only after lock, and to admins.
         allow read: if signedIn()
-                    && (u == uid() || gameLocked(gameId) || isAdmin());
+                    && (u == uid()
+                        || resource.data.uid == uid()
+                        || gameLocked(gameId)
+                        || isAdmin());
         // Create/update only your own pick, only while the game is OPEN AND before the
         // server-clock lock time. Late joiners (post-lock) are blocked here -> spectators.
         allow create, update: if signedIn() && u == uid()
