@@ -4,7 +4,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { Countdown } from '@/components/Countdown';
 import { formatEventDate } from '@/lib/format';
 import { useAuth } from '@/context/AuthContext';
-import { useUserGames } from '@/hooks/data';
+import { useUserGames, isLocked } from '@/hooks/data';
 import { EmptyState } from '@/components/EmptyState';
 import { PreviousResults } from '@/components/PreviousResults';
 
@@ -39,7 +39,9 @@ export function UserDashboard() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
               {active.map(({ game: g }) => {
-                const open = g.status === 'OPEN';
+                // "Open" = still accepting picks. A past-lock game (even if status is still
+                // OPEN) is live/in-progress, so show that instead of a dead countdown.
+                const open = g.status === 'OPEN' && !isLocked(g);
                 return (
                   <Link
                     key={g.id}
