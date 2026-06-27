@@ -23,8 +23,9 @@ export function isAdminUser(user: UserProfile | null): boolean {
   return user?.role === 'admin' || user?.role === 'superadmin';
 }
 
-/** The game currently being scored — past lock, not closed. Most recent wins if several. */
-export function useLiveGame(): Game | null {
+/** Home-page games from one games subscription: the one being scored (past lock, not closed)
+ *  and the pod's most recently closed game. Most recent wins by lockTime if several. */
+export function useHomeGames(): { liveGame: Game | null; latestClosed: Game | null } {
   const [games, setGames] = useState<Game[]>([]);
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -34,10 +35,10 @@ export function useLiveGame(): Game | null {
     return store.subscribeAllGames(setGames);
   }, []);
   return useMemo(() => {
-    const live = games
-      .filter((g) => g.status !== 'CLOSED' && isLocked(g))
-      .sort((a, b) => b.lockTime - a.lockTime);
-    return live[0] ?? null;
+    const byRecent = (a: Game, b: Game) => b.lockTime - a.lockTime;
+    const live = games.filter((g) => g.status !== 'CLOSED' && isLocked(g)).sort(byRecent);
+    const closed = games.filter((g) => g.status === 'CLOSED').sort(byRecent);
+    return { liveGame: live[0] ?? null, latestClosed: closed[0] ?? null };
   }, [games]);
 }
 
