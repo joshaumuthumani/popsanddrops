@@ -23,6 +23,24 @@ export function isAdminUser(user: UserProfile | null): boolean {
   return user?.role === 'admin' || user?.role === 'superadmin';
 }
 
+/** The game currently being scored — past lock, not closed. Most recent wins if several. */
+export function useLiveGame(): Game | null {
+  const [games, setGames] = useState<Game[]>([]);
+  useEffect(() => {
+    if (!isFirebaseConfigured) {
+      setGames(MOCK_GAMES);
+      return;
+    }
+    return store.subscribeAllGames(setGames);
+  }, []);
+  return useMemo(() => {
+    const live = games
+      .filter((g) => g.status !== 'CLOSED' && isLocked(g))
+      .sort((a, b) => b.lockTime - a.lockTime);
+    return live[0] ?? null;
+  }, [games]);
+}
+
 export function useGame(gameId?: string) {
   const [game, setGame] = useState<Game | null>(null);
   const [loading, setLoading] = useState(true);

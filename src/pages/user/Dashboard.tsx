@@ -1,10 +1,11 @@
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { PageTitle, SectionLabel } from '@/components/primitives';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Countdown } from '@/components/Countdown';
 import { formatEventDate } from '@/lib/format';
 import { useAuth } from '@/context/AuthContext';
-import { useUserGames, isLocked } from '@/hooks/data';
+import { useUserGames, useLiveGame, isLocked } from '@/hooks/data';
 import { EmptyState } from '@/components/EmptyState';
 import { PreviousResults } from '@/components/PreviousResults';
 
@@ -12,6 +13,18 @@ import { PreviousResults } from '@/components/PreviousResults';
 export function UserDashboard() {
   const { user } = useAuth();
   const { joined, loading } = useUserGames(user);
+  const navigate = useNavigate();
+  const liveGame = useLiveGame();
+
+  // When a game is being scored, land everyone straight on its live board. Only once per
+  // game per browser session, so returning to "Your Challenges" doesn't trap you in a loop.
+  useEffect(() => {
+    if (!liveGame) return;
+    const key = `pd-autoopened-${liveGame.id}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+    navigate(`/app/game/${liveGame.id}`, { replace: true });
+  }, [liveGame, navigate]);
 
   const active = joined.filter((j) => j.game.status !== 'CLOSED');
   const previous = joined.filter((j) => j.game.status === 'CLOSED');

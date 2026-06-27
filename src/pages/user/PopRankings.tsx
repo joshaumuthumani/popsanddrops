@@ -17,7 +17,8 @@ function grade(pick: string | undefined, correct: string | undefined): GradeStat
   return pick === correct ? 'pop' : 'drop';
 }
 
-/** USER · LIVE BOARD — Pop Count / rank / graded stat cards, your picks, live Pop Rankings. */
+/** USER · LIVE BOARD — Pop Count / rank / graded stat cards, your picks, live Pop Rankings.
+ *  Spectators (no submission) still see the live board. */
 export function PopRankings({ game, submission, results, leaderboard, meUid }: Props) {
   const totalQuestions = game.matches.length + game.propBets.length;
   const gradedCount =
@@ -29,66 +30,64 @@ export function PopRankings({ game, submission, results, leaderboard, meUid }: P
     : null;
   const myRank = leaderboard.find((e) => e.uid === meUid)?.rank;
 
-  if (!submission) {
-    return (
-      <section>
-        <p className="text-muted" style={{ fontSize: 14 }}>
-          You haven't locked in picks for this challenge yet. Head to <strong style={{ color: '#E7C92F' }}>Make Picks</strong> to get in before the bell.
-        </p>
-      </section>
+  const board =
+    leaderboard.length === 0 ? (
+      <p className="text-muted" style={{ fontSize: 13 }}>
+        Rankings unlock when the show starts and picks lock. Check back at bell time.
+      </p>
+    ) : (
+      <PopRankingsTable entries={leaderboard} meUid={meUid} showDrops />
     );
-  }
 
   return (
     <section>
-      {/* stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 14, marginBottom: 24 }}>
-        <StatCard label="POP COUNT" value={myTally?.popCount ?? 0} highlight />
-        <StatCard label="YOUR RANK" value={myRank ?? '—'} sub={leaderboard.length ? `/${leaderboard.length}` : undefined} />
-        <StatCard label="GRADED" value={gradedCount} sub={`/${totalQuestions}`} />
-      </div>
+      {submission ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 14, marginBottom: 24 }}>
+          <StatCard label="POP COUNT" value={myTally?.popCount ?? 0} highlight />
+          <StatCard label="YOUR RANK" value={myRank ?? '—'} sub={leaderboard.length ? `/${leaderboard.length}` : undefined} />
+          <StatCard label="GRADED" value={gradedCount} sub={`/${totalQuestions}`} />
+        </div>
+      ) : (
+        <p className="text-muted" style={{ fontSize: 14, marginBottom: 20, lineHeight: 1.55 }}>
+          You're <strong style={{ color: '#77E0E8' }}>spectating</strong> — you didn't lock in picks for this challenge, but here's the live board.
+        </p>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 18 }}>
-        {/* your picks */}
-        <div>
-          <SectionLabel style={{ marginBottom: 12 }}>Your picks</SectionLabel>
-          <div className="flex flex-col gap-2.5">
-            {game.matches.map((m) => {
-              const pick = submission.matchPicks[m.id];
-              const state = grade(pick, results[m.id]);
-              const popped = state === 'pop';
-              return (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between"
-                  style={{
-                    background: popped ? 'rgba(231,201,47,.1)' : 'rgba(255,255,255,.03)',
-                    border: `1px solid ${popped ? 'rgba(231,201,47,.3)' : 'rgba(255,255,255,.06)'}`,
-                    borderRadius: 12,
-                    padding: '13px 15px',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: '#6B7A99' }}>{m.name}</div>
-                    <div style={{ fontWeight: 800, fontSize: 14.5 }}>{pick ?? '—'}</div>
+        {submission && (
+          <div>
+            <SectionLabel style={{ marginBottom: 12 }}>Your picks</SectionLabel>
+            <div className="flex flex-col gap-2.5">
+              {game.matches.map((m) => {
+                const pick = submission.matchPicks[m.id];
+                const state = grade(pick, results[m.id]);
+                const popped = state === 'pop';
+                return (
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between"
+                    style={{
+                      background: popped ? 'rgba(231,201,47,.1)' : 'rgba(255,255,255,.03)',
+                      border: `1px solid ${popped ? 'rgba(231,201,47,.3)' : 'rgba(255,255,255,.06)'}`,
+                      borderRadius: 12,
+                      padding: '13px 15px',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: '#6B7A99' }}>{m.name}</div>
+                      <div style={{ fontWeight: 800, fontSize: 14.5 }}>{pick ?? '—'}</div>
+                    </div>
+                    <PopDropPill state={state} />
                   </div>
-                  <PopDropPill state={state} />
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* pop rankings */}
         <div>
           <SectionLabel style={{ marginBottom: 12 }}>Pop Rankings</SectionLabel>
-          {leaderboard.length === 0 ? (
-            <p className="text-muted" style={{ fontSize: 13 }}>
-              Rankings unlock when the show starts and picks lock. Check back at bell time.
-            </p>
-          ) : (
-            <PopRankingsTable entries={leaderboard} meUid={meUid} showDrops />
-          )}
+          {board}
         </div>
       </div>
     </section>
