@@ -162,7 +162,7 @@ export function GameBuilder() {
    * losing a question an admin typed would be far worse than putting it on the wrong night.
    */
   const changeDayCount = (next: number) => {
-    const n = Math.max(1, Math.min(10, Math.floor(next) || 1));
+    const n = Math.max(1, Math.min(6, Math.floor(next) || 1));
     setDayCount(n);
     const clamp = (qs: DraftQuestion[]) => qs.map((q) => ({ ...q, day: Math.min(q.day ?? 1, n) }));
     setMatches(clamp);
@@ -267,14 +267,20 @@ export function GameBuilder() {
           </div>
           <div>
             <label style={labelStyle}>Nights</label>
-            <input
-              type="number"
-              min={1}
-              max={10}
+            {/* A dropdown, not a number input: a controlled number field that clamps on every
+                keystroke can't be typed into — "1" + "2" becomes "12", clamps, and lands on
+                something you didn't ask for, and clearing it snaps straight back to 1. */}
+            <select
               value={dayCount}
               onChange={(e) => changeDayCount(Number(e.target.value))}
-              style={inputStyle}
-            />
+              style={{ ...inputStyle, cursor: 'pointer' }}
+            >
+              {Array.from({ length: 6 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>
+                  {i + 1} {i === 0 ? 'night' : 'nights'}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         {dayCount > 1 && (
