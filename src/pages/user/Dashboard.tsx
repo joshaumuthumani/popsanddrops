@@ -50,8 +50,27 @@ export function UserDashboard() {
 
   return (
     <div>
-      <div style={{ marginBottom: 22 }}>
+      {/* Join lives in the header, not buried below the game list — it's the one action a
+          player needs when the pod posts a new code, and previously it only appeared in the
+          empty state, so anyone already in a game had no way to join another. Mirrors the
+          title + actions header on All Challenges. */}
+      <div className="flex items-end justify-between gap-4 flex-wrap" style={{ marginBottom: 22 }}>
         <PageTitle>Your Challenges</PageTitle>
+        <Link
+          to="/join"
+          className="no-underline font-extrabold"
+          style={{
+            border: '1.5px solid rgba(119,224,232,.45)',
+            background: 'rgba(119,224,232,.12)',
+            color: '#77E0E8',
+            borderRadius: 11,
+            padding: '11px 18px',
+            fontSize: 13.5,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          + Join a challenge
+        </Link>
       </div>
 
       {loading ? (
