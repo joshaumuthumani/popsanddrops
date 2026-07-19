@@ -58,6 +58,13 @@ export function PosterPicker({ value, onChange, uid, onPendingChange }: Props) {
     onPendingChange?.(pending);
   }, [pending, onPendingChange]);
 
+  // Retract the flag when this picker goes away — the row it belonged to was removed, so the
+  // admin has no way to act on it. Without this the builder keeps counting a pending link for
+  // a question that no longer exists and refuses to publish. Unmount only: a cleanup tied to
+  // `pending` would fight the effect above on every keystroke.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => onPendingChange?.(false), []);
+
   // Both paths need Storage/Functions, neither of which exists in Phase-0 demo mode.
   const live = isFirebaseConfigured && Boolean(uid);
 

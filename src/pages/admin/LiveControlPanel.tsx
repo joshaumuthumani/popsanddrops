@@ -36,6 +36,7 @@ function NightStandingsButton({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
+  const [partial, setPartial] = useState('');
 
   const isFinalNight = night.day >= nightCount(game);
   if (isFinalNight) return null; // covered by the close-game results email
@@ -49,8 +50,16 @@ function NightStandingsButton({
     setError('');
     setBusy(true);
     try {
-      await sendNightStandings(game.id, night.day);
+      const { recipients, failed } = await sendNightStandings(game.id, night.day);
       setSent(true);
+      // Some players got it and some didn't. The night stays claimed (a retry would mail the
+      // successful ones twice), so this notice is the admin's only signal that it happened.
+      setPartial(
+        failed > 0
+          ? `Sent to ${recipients} ${recipients === 1 ? 'player' : 'players'}, but ${failed} ` +
+              `${failed === 1 ? 'email' : 'emails'} failed to send.`
+          : '',
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send standings.');
     } finally {
@@ -95,6 +104,7 @@ function NightStandingsButton({
         </p>
       )}
       {error && <p style={{ color: '#C0392B', fontSize: 12, marginTop: 6 }}>{error}</p>}
+      {partial && <p style={{ color: '#E7C92F', fontSize: 12, marginTop: 6 }}>{partial}</p>}
     </div>
   );
 }

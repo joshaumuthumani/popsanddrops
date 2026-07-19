@@ -77,7 +77,9 @@ export interface PropBet {
 
 A flat array with a `day` tag was chosen over restructuring `Game` into `days: Day[]` with questions nested inside. Nesting would break every existing game, require a migration, and — decisively — break `questionIds()`, which flattens both arrays.
 
-**Consequence worth stating plainly: `src/lib/scoring.ts` and `functions/src/scoring.ts` require no changes at all.** Tally, ranking, tiebreaker, and leaderboard construction all keep working, because they iterate the same flat arrays they always did. The mirror invariant is never at risk.
+**Consequence worth stating plainly: no scoring *behaviour* changes.** Tally, ranking, tiebreaker, and leaderboard construction all keep working, because they iterate the same flat arrays they always did.
+
+The one edit either file needs is type-only: `functions/src/scoring.ts` declares its own `GameDoc` shape, so it gains `day?: number` on `matches`/`propBets` to stay aligned with `src/types.ts`. Nothing reads that field in the tally. `src/lib/scoring.ts` needs no edit at all, because it imports `Game`/`Match`/`PropBet` from `src/types.ts` rather than redeclaring them. The mirror invariant holds, but "untouched" would be the wrong word for it.
 
 `normalizeGame()` in `src/lib/store.ts` defaults `dayCount` to `1` when absent, so existing game documents need no migration and render exactly as they do today.
 
@@ -160,7 +162,7 @@ Depends on Story 1 (there is no "night" to report on without it).
 
 ## Testing
 
-Scoring is untouched, so no scoring behaviour is at risk. Grouping is pure and derived, so `questionsByDay()` is directly testable.
+Scoring behaviour is unchanged (the only scoring-file edit is the type-only `day?` field noted above), so no scoring behaviour is at risk. Grouping is pure and derived, so `questionsByDay()` is directly testable.
 
 **Manual verification:**
 

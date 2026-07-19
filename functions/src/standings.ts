@@ -104,12 +104,33 @@ export const sendNightStandings = onCall<{ gameId?: string; night?: number }>(as
     );
   }
 
-  // Claim the night BEFORE sending. If the send partially fails we'd rather under-send than
-  // let a retry mail everyone a second time; per-recipient failures are logged to emailLog.
+  // Claim the night BEFORE sending, so a double-click or concurrent admin can't mail everyone
+  // twice. If the send PARTIALLY fails we keep the claim and stand by that trade — under-send
+  // beats double-send, and the failures land in emailLog.
   await gameSnap.ref.update({ standingsSentFor: FieldValue.arrayUnion(night) });
 
-  await sendStandingsEmail(gameId, game, 'interim', night);
-  logger.info(`Night ${night} standings sent for game ${gameId} to ${entryCount} player(s) by ${uid}.`);
+  const outcome = await sendStandingsEmail(gameId, game, 'interim', night);
 
-  return { sent: true, night, recipients: entryCount };
+  // A TOTAL failure is a different case, and it used to be invisible: every per-recipient send
+  // is caught and logged, so a bad API key, an unverified domain or a Resend outage failed all
+  // of them while this function still returned success — with the night permanently burned and
+  // the button disabled forever. Release the claim so the admin can genuinely retry, and fail
+  // loudly rather than reporting a send that never happened.
+  if (outcome.delivered === 0) {
+    await gameSnap.ref.update({ standingsSentFor: FieldValue.arrayRemove(night) });
+    logger.error(`Night ${night} standings for game ${gameId} reached nobody; claim released.`, outcome);
+    throw new HttpsError(
+      'internal',
+      outcome.configured
+        ? `Couldn't send the Night ${night} standings — no email reached anyone. Nothing was recorded, so you can try again.`
+        : 'Email isn\'t configured for this environment (RESEND_API_KEY is not set), so no standings were sent.',
+    );
+  }
+
+  logger.info(
+    `Night ${night} standings sent for game ${gameId} by ${uid}: ` +
+      `${outcome.delivered} delivered, ${outcome.failed} failed, ${outcome.noAddress} without an address.`,
+  );
+
+  return { sent: true, night, recipients: outcome.delivered, failed: outcome.failed };
 });

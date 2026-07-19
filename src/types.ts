@@ -21,9 +21,11 @@ export interface Match {
   name: string;
   options: string[];
   /**
-   * Match poster, rendered as a 16:9 banner atop the pick card. Always a Firebase
-   * Storage download URL — pasted links are re-hosted (see src/lib/posters.ts) so the
-   * app never depends on a third-party CDN. Optional: matches may have no poster.
+   * Match poster, rendered as a 16:9 banner atop the pick card. In live mode this is always a
+   * Firebase Storage download URL — pasted links are re-hosted (see src/lib/posters.ts) so the
+   * app never depends on a third-party CDN, and no third-party URL is ever persisted here.
+   * Demo-mode fixtures in src/data/mock.ts use inline `data:` URIs, which are never written to
+   * Firestore; don't assume this parses as a Storage URL. Optional: matches may have no poster.
    */
   posterUrl?: string;
   /** 1-based night this match belongs to on a multi-night card. Absent ⇒ night 1. */
