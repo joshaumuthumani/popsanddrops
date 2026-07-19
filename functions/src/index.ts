@@ -105,7 +105,9 @@ export async function sendStandingsEmail(
 
   const top3 = entries.filter((e) => e.rank <= 3).slice(0, 3);
   const leader = entries.find((e) => e.rank === 1);
-  const scoreboardLink = `${appUrl}/app/game/${gameId}`;
+  // ?view=rankings so the link honours its own label — without it the app opens on Make
+  // Picks and the reader lands on a pick sheet instead of the board they clicked for.
+  const scoreboardLink = `${appUrl}/app/game/${gameId}?view=rankings`;
   const gameName = game.name ?? 'the challenge';
   const isInterim = variant === 'interim';
 

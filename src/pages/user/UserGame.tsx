@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { Eyebrow, PageTitle } from '@/components/primitives';
 import { SegmentedTabs } from '@/components/SegmentedTabs';
 import { MakePicks } from '@/pages/user/MakePicks';
@@ -16,10 +16,14 @@ export function UserGame() {
   const { gameId } = useParams();
   const { user } = useAuth();
   const { game, loading } = useGame(gameId);
-  const { submission } = useMySubmission(gameId, user?.uid);
+  const { submission, loading: submissionLoading } = useMySubmission(gameId, user?.uid);
   const results = useResults(gameId);
   const leaderboard = useLeaderboard(game, user);
-  const [screen, setScreen] = useState<Screen>('predict');
+  // ?view=rankings deep-links straight to the board. Result emails link here promising
+  // "View the full Pop Rankings", and without this they land on Make Picks instead.
+  const [searchParams] = useSearchParams();
+  const wantsRankings = searchParams.get('view') === 'rankings';
+  const [screen, setScreen] = useState<Screen>(wantsRankings ? 'live' : 'predict');
   const [saving, setSaving] = useState(false);
 
   const locked = game ? isLocked(game) : false;
@@ -29,7 +33,11 @@ export function UserGame() {
     if (locked) setScreen('live');
   }, [locked]);
 
-  if (loading) return <p className="text-muted">Loading…</p>;
+  // Wait for the submission too. MakePicks seeds its state from these props with useState,
+  // which only reads them on mount — rendering before the subscription resolves meant it
+  // initialised empty and then ignored the picks when they arrived, so a player who had
+  // already submitted was shown a blank pick sheet and told "0 of N locked in".
+  if (loading || submissionLoading) return <p className="text-muted">Loading…</p>;
   if (!game) return <p className="text-muted">That game doesn't exist or the code was wrong.</p>;
 
   // Deliberately does NOT swallow errors: MakePicks awaits this and only confirms on
