@@ -24,10 +24,19 @@ earlier model did exactly that, and a freshly promoted admin saw an empty consol
 - **`src/lib/scoring.ts` and `functions/src/scoring.ts` are mirrors.** Change one, change the other.
 - **The pick lock is enforced by the server clock in rules** (`request.time.toMillis() >= lockTime`),
   not by stored status. Don't replace it with a status check.
-- **The dashboard's collection-group query needs two things**: a `COLLECTION_GROUP` index on
-  `submissions.uid` in `firestore.indexes.json`, *and* a `resource.data.uid == uid()` branch in the
-  submissions read rule. A doc-id match alone does **not** authorize a field-filtered
-  collection-group query. Removing either silently blanks every player's dashboard.
+- **The dashboard's collection-group query needs three things**, and missing any one of them
+  silently blanks every player's dashboard:
+  1. A `COLLECTION_GROUP` index on `submissions.uid` in `firestore.indexes.json`.
+  2. A **recursive-wildcard** rule — `match /{path=**}/submissions/{u}` — allowing
+     `resource.data.uid == uid()`. This is the non-obvious one. A rule nested under
+     `/games/{gameId}/submissions/{u}` secures that *path* but does **not** authorize a
+     collection-group query, no matter what conditions it contains
+     ([docs](https://firebase.google.com/docs/firestore/security/rules-query)). The nested
+     rule looks correct while doing nothing for the query.
+  3. `rules_version = '2'`, which the recursive wildcard requires.
+
+  This was mis-documented as "index + uid branch" for a long time, and the dashboard was
+  quietly broken the whole while — the nested rule had the right condition at the wrong path.
 - **Match posters are always re-hosted in our own Storage bucket.** Never persist a third-party URL
   into `Match.posterUrl`.
 - **Closed games are frozen** for everyone.

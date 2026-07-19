@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Game } from '@/types';
-import { Card, LiveBanner, NightHeading } from '@/components/primitives';
+import { Card, LiveBanner, NightHeading, SectionLabel } from '@/components/primitives';
 import { questionsByDay } from '@/lib/nights';
 import { PickButton } from '@/components/PickButton';
 import { CheckIcon } from '@/components/icons';
@@ -109,13 +109,11 @@ export function LiveControlPanel({ game, readOnly = false }: Props) {
   // Single-night games come back as one unlabelled group, so the markup is one path.
   const nights = useMemo(
     () =>
-      questionsByDay(game).map((n) => ({
-        ...n,
-        questions: [
-          ...n.matches.map((m) => ({ id: m.id, name: m.name, options: m.options })),
-          ...n.propBets.map((p) => ({ id: p.id, name: p.question, options: p.options })),
-        ],
-      })),
+      questionsByDay(game).map((n) => {
+        const matches = n.matches.map((m) => ({ id: m.id, name: m.name, options: m.options }));
+        const props = n.propBets.map((p) => ({ id: p.id, name: p.question, options: p.options }));
+        return { ...n, matches, props, questions: [...matches, ...props] };
+      }),
     [game],
   );
   const questions = useMemo(() => nights.flatMap((n) => n.questions), [nights]);
@@ -150,21 +148,33 @@ export function LiveControlPanel({ game, readOnly = false }: Props) {
       {nights.map((night) => (
         <div key={night.day} style={{ marginBottom: 24 }}>
           {night.label && <NightHeading label={night.label} />}
-          <div className="flex flex-col gap-3">
-            {night.questions.map((q) => (
-
-              <Card key={q.id} style={{ padding: '16px 18px' }}>
-                <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#6B7A99', marginBottom: 12 }}>{q.name}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: q.options.length > 2 ? '1fr 1fr' : '1fr 1fr', gap: 10 }}>
-                  {q.options.map((opt) => (
-                    <PickButton key={opt} showCheck selected={results[q.id] === opt} onClick={() => mark(q.id, opt)}>
-                      {opt}
-                    </PickButton>
-                  ))}
+          {/* Matches and props are graded the same way but are different kinds of question —
+              label them so an admin calling results mid-show knows which list they're in. */}
+          {([
+            { title: 'Match predictions', items: night.matches },
+            { title: 'Prop bets', items: night.props },
+          ] as const).map(
+            ({ title, items }) =>
+              items.length > 0 && (
+                <div key={title} style={{ marginBottom: 18 }}>
+                  <SectionLabel style={{ margin: '2px 0 12px' }}>{title}</SectionLabel>
+                  <div className="flex flex-col gap-3">
+                    {items.map((q) => (
+                      <Card key={q.id} style={{ padding: '16px 18px' }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#6B7A99', marginBottom: 12 }}>{q.name}</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          {q.options.map((opt) => (
+                            <PickButton key={opt} showCheck selected={results[q.id] === opt} onClick={() => mark(q.id, opt)}>
+                              {opt}
+                            </PickButton>
+                          ))}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
                 </div>
-              </Card>
-            ))}
-          </div>
+              ),
+          )}
           {!readOnly && <NightStandingsButton game={game} night={night} />}
         </div>
       ))}

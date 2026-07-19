@@ -50,6 +50,21 @@ service cloud.firestore {
         && userRole(uid()) in ['admin', 'superadmin'];
     }
 
+    // ---- collection-group: submissions ----
+    // REQUIRED for the dashboard's `collectionGroup('submissions').where('uid','==',me)`
+    // query. A rule nested under /games/{gameId}/submissions/{u} secures that PATH, but it
+    // does NOT authorize a collection group query — Firestore requires a recursive-wildcard
+    // match for those:
+    //   https://firebase.google.com/docs/firestore/security/rules-query
+    // Without this the query is denied, every player's dashboard comes back empty, and the
+    // nested rule below looks correct while doing nothing for it.
+    //
+    // Scoped to your OWN submissions only, so it grants nothing the nested rule didn't
+    // already allow for direct reads. Broader reads (post-lock, admins) stay below.
+    match /{path=**}/submissions/{u} {
+      allow read: if signedIn() && resource.data.uid == uid();
+    }
+
     // ---- /users/{u} ----
     // Profiles are world-readable to signed-in users (leaderboard needs name+photo).
     // You may create only your own profile, and only with role 'user' (no self-promotion).

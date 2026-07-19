@@ -68,6 +68,10 @@ export function useGame(gameId?: string) {
 export function useUserGames(user: UserProfile | null) {
   const [joined, setJoined] = useState<store.JoinedGame[]>([]);
   const [loading, setLoading] = useState(true);
+  // Surfaced, not just logged: this query depends on a COLLECTION_GROUP index and a rules
+  // branch, and if either goes missing it fails silently — leaving a player who has joined
+  // games staring at "you have no challenges" with no hint anything broke.
+  const [error, setError] = useState(false);
   useEffect(() => {
     if (!isFirebaseConfigured) {
       setJoined(MOCK_GAMES.map((game) => ({ game, myResult: { popCount: 0, dropCount: 0, rank: 0 } })));
@@ -81,16 +85,20 @@ export function useUserGames(user: UserProfile | null) {
     }
     let alive = true;
     setLoading(true);
+    setError(false);
     store
       .fetchJoinedGames(user.uid)
       .then((j) => alive && setJoined(j))
-      .catch((e) => console.error('[useUserGames] failed to load joined games', e))
+      .catch((e) => {
+        console.error('[useUserGames] failed to load joined games', e);
+        if (alive) setError(true);
+      })
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
   }, [user]);
-  return { joined, loading };
+  return { joined, loading, error };
 }
 
 /** Games on the admin dashboard: every game (any admin sees all — shared-admin model). */

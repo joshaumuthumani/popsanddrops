@@ -13,7 +13,7 @@ import { GameResultsBoard } from '@/components/GameResultsBoard';
 /** User Dashboard — active challenges, the pod's latest result when idle, and your history. */
 export function UserDashboard() {
   const { user } = useAuth();
-  const { joined, loading } = useUserGames(user);
+  const { joined, loading, error } = useUserGames(user);
   const { liveGame, latestClosed } = useHomeGames();
   const navigate = useNavigate();
 
@@ -75,17 +75,31 @@ export function UserDashboard() {
 
       {loading ? (
         <p className="text-muted">Loading your challenges…</p>
+      ) : error ? (
+        // Never show the "you have no challenges" empty state on a failed load — a player
+        // who has joined games would be told the opposite of the truth.
+        <Card style={{ padding: 22, borderRadius: 16 }}>
+          <p style={{ color: '#C0392B', fontSize: 14, margin: 0, fontWeight: 700 }}>
+            Couldn't load your challenges.
+          </p>
+          <p className="text-muted" style={{ fontSize: 13, marginTop: 8, marginBottom: 0 }}>
+            This is a problem on our side, not a sign you haven't joined anything. Refresh to
+            try again — if it keeps happening, tell your pod's organizer.
+          </p>
+        </Card>
       ) : joined.length === 0 ? (
+        // Joining comes FIRST for someone with no games — it's the only thing they can act
+        // on. The pod's latest result is context, and burying the CTA under a leaderboard
+        // put the one useful control at the bottom of the page.
         <>
-          {latestResult}
-          <div style={{ marginTop: latestResult ? 24 : 0 }}>
-            <EmptyState
-              title="Jump into the action"
-              body="Got a join code from your pod's organizer? Enter it to play the next challenge."
-              ctaLabel="Enter a join code"
-              to="/join"
-            />
-          </div>
+          <EmptyState
+            title="Jump into the action"
+            body="Got a join code from your pod's organizer? Enter it to play the next challenge."
+            ctaLabel="Enter a join code"
+            to="/join"
+          />
+          {/* latestResult's own top margin assumes it leads the page; it now follows the CTA. */}
+          {latestResult && <div style={{ marginTop: 30 }}>{latestResult}</div>}
         </>
       ) : (
         <>

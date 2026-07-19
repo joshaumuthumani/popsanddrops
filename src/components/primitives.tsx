@@ -82,17 +82,21 @@ export function GoldButton({
   children,
   onClick,
   full = false,
+  disabled = false,
   style,
 }: {
   children: ReactNode;
   onClick?: () => void;
   full?: boolean;
+  /** Without this a dimmed-but-clickable button can swallow clicks with no feedback. */
+  disabled?: boolean;
   style?: CSSProperties;
 }) {
   return (
     <button
       onClick={onClick}
-      className="cursor-pointer font-black text-ink"
+      disabled={disabled}
+      className="font-black text-ink"
       style={{
         fontFamily: 'inherit',
         border: 'none',
@@ -106,6 +110,7 @@ export function GoldButton({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 9,
+        cursor: disabled ? 'not-allowed' : 'pointer',
         ...style,
       }}
     >
