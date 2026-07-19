@@ -148,10 +148,29 @@ export function MakePicks({
   const setMatch = (id: string, opt: string) => editable && setMatchPicks((p) => ({ ...p, [id]: opt }));
   const setProp = (id: string, opt: string) => editable && setPropPicks((p) => ({ ...p, [id]: opt }));
 
-  const total = game.matches.length + game.propBets.length;
-  const made = Object.keys(matchPicks).length + Object.keys(propPicks).length;
+  const questionCount = game.matches.length + game.propBets.length;
+  const picksMade = Object.keys(matchPicks).length + Object.keys(propPicks).length;
+  const missingPicks = questionCount - picksMade;
+  const missingTiebreaker = tiebreaker.trim() === '';
+
+  // The tiebreaker counts toward progress because you cannot lock in without it. Counting
+  // only picks let the bar read "10 of 10" while the button stayed disabled — which is how
+  // a player concludes they've submitted when they haven't.
+  const total = questionCount + 1;
+  const made = picksMade + (missingTiebreaker ? 0 : 1);
   const pct = Math.round((made / total) * 100);
-  const allAnswered = made === total && tiebreaker.trim() !== '';
+  const allAnswered = missingPicks === 0 && !missingTiebreaker;
+
+  /** Names what's still outstanding. The tiebreaker sits off to one side and is the single
+      most-missed input — "answer everything" doesn't tell you that's what you skipped. */
+  const missingLabel = !allAnswered
+    ? [
+        missingPicks > 0 ? `${missingPicks} ${missingPicks === 1 ? 'pick' : 'picks'}` : null,
+        missingTiebreaker ? 'the tiebreaker' : null,
+      ]
+        .filter(Boolean)
+        .join(' and ')
+    : '';
 
   /**
    * Only confirm once the save has actually resolved. This used to fire the toast
@@ -200,13 +219,16 @@ export function MakePicks({
       {/* progress */}
       <div className="flex items-center gap-3.5" style={{ marginBottom: 18 }}>
         <div style={{ flex: 1, height: 7, borderRadius: 4, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
+          {/* Scales rather than animating width — width transitions force layout on every frame. */}
           <div
             style={{
               height: '100%',
-              width: `${pct}%`,
+              width: '100%',
+              transform: `scaleX(${pct / 100})`,
+              transformOrigin: 'left',
               background: 'linear-gradient(90deg,#E7C92F,#F4DB6B)',
               borderRadius: 4,
-              transition: 'width .35s cubic-bezier(.16,1,.3,1)',
+              transition: 'transform .35s cubic-bezier(.16,1,.3,1)',
             }}
           />
         </div>
@@ -308,7 +330,7 @@ export function MakePicks({
         </p>
       ) : (
         <>
-          <GoldButton full onClick={submit} style={{ opacity: allAnswered && !saving ? 1 : 0.6 }}>
+          <GoldButton full onClick={submit} disabled={!allAnswered || saving} style={{ opacity: allAnswered && !saving ? 1 : 0.6 }}>
             {saving ? 'Locking in…' : 'Lock In Your Picks'}
           </GoldButton>
           {error ? (
@@ -317,7 +339,9 @@ export function MakePicks({
             </p>
           ) : (
             <p className="text-center text-muted" style={{ fontSize: 12.5, marginTop: 12 }}>
-              {allAnswered ? 'You can edit your picks until the countdown ends.' : `Answer all ${total} picks + the tiebreaker to lock in.`}
+              {allAnswered
+                ? 'You can edit your picks until the countdown ends.'
+                : `Still need ${missingLabel} before you can lock in.`}
             </p>
           )}
         </>
