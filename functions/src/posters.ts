@@ -151,8 +151,12 @@ async function fetchImage(startUrl: string): Promise<Buffer> {
 /**
  * Fetches a third-party image, normalizes it, and stores it under posters/{uid}/.
  * Returns a Firebase Storage download URL in the same format the client SDK produces.
+ *
+ * 512MiB rather than the 256MiB default: sharp decodes to a raw bitmap before resizing, so a
+ * 5MB JPEG at 6000x4000 needs ~72MB uncompressed plus overhead. The default left too little
+ * headroom, and an OOM here surfaces as a generic failure rather than a useful error.
  */
-export const ingestPosterFromUrl = onCall<{ url?: string }>(async (request) => {
+export const ingestPosterFromUrl = onCall<{ url?: string }>({ memory: '512MiB' }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in to add a poster.');
 
