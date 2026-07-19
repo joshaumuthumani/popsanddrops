@@ -27,3 +27,6 @@ functions/lib
 .idea
 .DS_Store
 *.log
+
+# Superpowers brainstorming sessions
+.superpowers/
