@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import type { Game, Match } from '@/types';
-import { Card, GoldButton, LiveBanner, SectionLabel } from '@/components/primitives';
+import { Card, GoldButton, LiveBanner, NightHeading, SectionLabel } from '@/components/primitives';
 import { PickButton } from '@/components/PickButton';
 import { Countdown } from '@/components/Countdown';
 import { Toast } from '@/components/Toast';
+import { questionsByDay } from '@/lib/nights';
 
 interface MatchCardProps {
   match: Match;
@@ -157,6 +158,8 @@ export function MakePicks({
   };
 
   const lockLabel = useMemo(() => new Date(game.lockTime).toLocaleString(), [game.lockTime]);
+  // Single-night games come back as one unlabelled group, so the markup below is one path.
+  const nights = useMemo(() => questionsByDay(game), [game]);
 
   return (
     <section>
@@ -195,43 +198,56 @@ export function MakePicks({
         </span>
       </div>
 
-      {/* MATCH PREDICTIONS */}
-      <SectionLabel style={{ margin: '6px 0 14px' }}>Match predictions · 1 Pop each</SectionLabel>
-      <div className="flex flex-col gap-3" style={{ marginBottom: 30 }}>
-        {game.matches.map((m) => (
-          <MatchCard key={m.id} match={m} selected={matchPicks[m.id]} onPick={(opt) => setMatch(m.id, opt)} />
-        ))}
-      </div>
+      {/* QUESTIONS — grouped by night on multi-night cards, ungrouped otherwise. */}
+      {nights.map((night) => (
+        <div key={night.day}>
+          {night.label && <NightHeading label={night.label} />}
 
-      {/* PROP BETS */}
-      <SectionLabel style={{ margin: '6px 0 14px' }}>Prop bets · 1 Pop each</SectionLabel>
-      <div className="flex flex-col gap-3" style={{ marginBottom: 18 }}>
-        {game.propBets.map((p) => (
-          <Card key={p.id} style={{ padding: '16px 18px' }} className="flex items-center justify-between gap-4 flex-wrap">
-            <div style={{ fontWeight: 700, fontSize: 14.5, color: '#C8D4E8' }}>{p.question}</div>
-            <div className="flex gap-2 flex-wrap">
-              {p.options.map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => setProp(p.id, opt)}
-                  className="cursor-pointer font-extrabold transition-all duration-200"
-                  style={{
-                    fontFamily: 'inherit',
-                    fontSize: 13.5,
-                    padding: p.options.length > 2 ? '10px 18px' : '10px 22px',
-                    borderRadius: 9,
-                    border: `1.5px solid ${propPicks[p.id] === opt ? '#E7C92F' : 'rgba(255,255,255,.1)'}`,
-                    background: propPicks[p.id] === opt ? 'rgba(231,201,47,.14)' : 'rgba(255,255,255,.03)',
-                    color: propPicks[p.id] === opt ? '#E7C92F' : '#C8D4E8',
-                  }}
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </Card>
-        ))}
-      </div>
+          {night.matches.length > 0 && (
+            <>
+              <SectionLabel style={{ margin: '6px 0 14px' }}>Match predictions · 1 Pop each</SectionLabel>
+              <div className="flex flex-col gap-3" style={{ marginBottom: 30 }}>
+                {night.matches.map((m) => (
+                  <MatchCard key={m.id} match={m} selected={matchPicks[m.id]} onPick={(opt) => setMatch(m.id, opt)} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {night.propBets.length > 0 && (
+            <>
+              <SectionLabel style={{ margin: '6px 0 14px' }}>Prop bets · 1 Pop each</SectionLabel>
+              <div className="flex flex-col gap-3" style={{ marginBottom: 18 }}>
+                {night.propBets.map((p) => (
+                  <Card key={p.id} style={{ padding: '16px 18px' }} className="flex items-center justify-between gap-4 flex-wrap">
+                    <div style={{ fontWeight: 700, fontSize: 14.5, color: '#C8D4E8' }}>{p.question}</div>
+                    <div className="flex gap-2 flex-wrap">
+                      {p.options.map((opt) => (
+                        <button
+                          key={opt}
+                          onClick={() => setProp(p.id, opt)}
+                          className="cursor-pointer font-extrabold transition-all duration-200"
+                          style={{
+                            fontFamily: 'inherit',
+                            fontSize: 13.5,
+                            padding: p.options.length > 2 ? '10px 18px' : '10px 22px',
+                            borderRadius: 9,
+                            border: `1.5px solid ${propPicks[p.id] === opt ? '#E7C92F' : 'rgba(255,255,255,.1)'}`,
+                            background: propPicks[p.id] === opt ? 'rgba(231,201,47,.14)' : 'rgba(255,255,255,.03)',
+                            color: propPicks[p.id] === opt ? '#E7C92F' : '#C8D4E8',
+                          }}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      ))}
 
       {/* TIEBREAKER */}
       <div

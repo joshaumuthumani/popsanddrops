@@ -36,6 +36,8 @@ function normalizeGame(id: string, data: Record<string, unknown>): Game {
     promotion: (data.promotion as string) ?? '',
     eventDate: (data.eventDate as string) ?? '',
     lockTime: Number(data.lockTime ?? 0),
+    // Games created before multi-night support have no dayCount — they're single-night.
+    dayCount: Math.max(1, Number(data.dayCount ?? 1) || 1),
     status: (data.status as GameStatus) ?? 'OPEN',
     matches: (data.matches as Game['matches']) ?? [],
     propBets: (data.propBets as Game['propBets']) ?? [],
@@ -127,6 +129,7 @@ export interface NewGameInput {
   promotion: string;
   eventDate: string;
   lockTime: number;
+  dayCount: number;
   matches: Game['matches'];
   propBets: Game['propBets'];
   tiebreakerQuestion: string;
@@ -140,6 +143,7 @@ export async function createGame(input: NewGameInput, creator: UserProfile): Pro
     promotion: input.promotion.trim(),
     eventDate: input.eventDate,
     lockTime: input.lockTime,
+    dayCount: Math.max(1, input.dayCount || 1),
     status: 'OPEN' as GameStatus,
     matches: input.matches,
     propBets: input.propBets,

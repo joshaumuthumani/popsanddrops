@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Game } from '@/types';
-import { Card, LiveBanner } from '@/components/primitives';
+import { Card, LiveBanner, NightHeading } from '@/components/primitives';
+import { questionsByDay } from '@/lib/nights';
 import { PickButton } from '@/components/PickButton';
 import { CheckIcon } from '@/components/icons';
 import { useAuth } from '@/context/AuthContext';
@@ -21,14 +22,20 @@ export function LiveControlPanel({ game, readOnly = false }: Props) {
   const { user } = useAuth();
   const results = useResults(game.id);
 
-  // Every gradeable question — matches then prop bets (PRD §4.2).
-  const questions = useMemo(
-    () => [
-      ...game.matches.map((m) => ({ id: m.id, name: m.name, options: m.options })),
-      ...game.propBets.map((p) => ({ id: p.id, name: p.question, options: p.options })),
-    ],
+  // Every gradeable question, grouped by night — matches then prop bets (PRD §4.2).
+  // Single-night games come back as one unlabelled group, so the markup is one path.
+  const nights = useMemo(
+    () =>
+      questionsByDay(game).map((n) => ({
+        ...n,
+        questions: [
+          ...n.matches.map((m) => ({ id: m.id, name: m.name, options: m.options })),
+          ...n.propBets.map((p) => ({ id: p.id, name: p.question, options: p.options })),
+        ],
+      })),
     [game],
   );
+  const questions = useMemo(() => nights.flatMap((n) => n.questions), [nights]);
   const called = questions.filter((q) => results[q.id] !== undefined && results[q.id] !== '').length;
 
   const mark = (questionId: string, option: string) => {
@@ -57,20 +64,25 @@ export function LiveControlPanel({ game, readOnly = false }: Props) {
         />
       </div>
 
-      <div className="flex flex-col gap-3" style={{ marginBottom: 24 }}>
-        {questions.map((q) => (
-          <Card key={q.id} style={{ padding: '16px 18px' }}>
-            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#6B7A99', marginBottom: 12 }}>{q.name}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: q.options.length > 2 ? '1fr 1fr' : '1fr 1fr', gap: 10 }}>
-              {q.options.map((opt) => (
-                <PickButton key={opt} showCheck selected={results[q.id] === opt} onClick={() => mark(q.id, opt)}>
-                  {opt}
-                </PickButton>
-              ))}
-            </div>
-          </Card>
-        ))}
-      </div>
+      {nights.map((night) => (
+        <div key={night.day} style={{ marginBottom: 24 }}>
+          {night.label && <NightHeading label={night.label} />}
+          <div className="flex flex-col gap-3">
+            {night.questions.map((q) => (
+              <Card key={q.id} style={{ padding: '16px 18px' }}>
+                <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#6B7A99', marginBottom: 12 }}>{q.name}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: q.options.length > 2 ? '1fr 1fr' : '1fr 1fr', gap: 10 }}>
+                  {q.options.map((opt) => (
+                    <PickButton key={opt} showCheck selected={results[q.id] === opt} onClick={() => mark(q.id, opt)}>
+                      {opt}
+                    </PickButton>
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ))}
 
       {readOnly ? (
         <p className="text-center text-muted" style={{ fontSize: 13, padding: '10px 0' }}>

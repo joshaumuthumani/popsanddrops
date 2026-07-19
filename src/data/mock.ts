@@ -21,6 +21,9 @@ export const MOCK_GAME: Game = {
   promotion: 'AEW',
   eventDate: '2026-08-30',
   lockTime: LOCK_TIME,
+  // Two nights, so demo mode exercises night grouping. WrestleMania 42 below stays
+  // single-night, covering the ungrouped path in the same session.
+  dayCount: 2,
   status: 'OPEN',
   joinCode: 'SLAM-4827',
   tiebreakerQuestion: 'Main event match length, in minutes',
@@ -39,10 +42,10 @@ export const MOCK_GAME: Game = {
     },
     { id: 'm2', name: 'AEW INTERNATIONAL CHAMPIONSHIP', options: ['Konosuke Takeshita', 'Kyle Fletcher'] },
     { id: 'm3', name: "AEW WOMEN'S WORLD TITLE", options: ['Toni Storm', 'Mariah May'] },
-    { id: 'm4', name: 'AEW TNT CHAMPIONSHIP', options: ['Jon Moxley', 'Darby Allin'] },
-    { id: 'm5', name: 'AEW WORLD TAG TEAM', options: ['The Young Bucks', 'FTR'] },
+    { id: 'm4', day: 2, name: 'AEW TNT CHAMPIONSHIP', options: ['Jon Moxley', 'Darby Allin'] },
+    { id: 'm5', day: 2, name: 'AEW WORLD TAG TEAM', options: ['The Young Bucks', 'FTR'] },
     {
-      id: 'm6',
+      id: 'm6', day: 2,
       name: 'AEW CASINO GAUNTLET · WINNER',
       options: ['“Hangman” Adam Page', 'Kazuchika Okada', 'MJF', 'Orange Cassidy'],
       // Second demo poster, on a 4-option match — exercises the case where the choices
@@ -54,8 +57,8 @@ export const MOCK_GAME: Game = {
   propBets: [
     { id: 'p1', question: 'A new champion is crowned tonight?', options: ['Yes', 'No'] },
     { id: 'p2', question: 'Will the main event go past 25 minutes?', options: ['Yes', 'No'] },
-    { id: 'p3', question: 'Will there be a surprise return or debut?', options: ['Yes', 'No'] },
-    { id: 'p4', question: 'How does the main event end?', options: ['Pinfall', 'Submission', 'DQ / No contest'] },
+    { id: 'p3', day: 2, question: 'Will there be a surprise return or debut?', options: ['Yes', 'No'] },
+    { id: 'p4', day: 2, question: 'How does the main event end?', options: ['Pinfall', 'Submission', 'DQ / No contest'] },
   ],
 };
 
@@ -68,6 +71,7 @@ export const MOCK_GAMES: Game[] = [
     promotion: 'WWE',
     eventDate: '2026-04-05',
     lockTime: Date.now() - 86_400_000 * 4,
+    dayCount: 1,
     status: 'CLOSED',
     joinCode: 'MANIA-1042',
     tiebreakerQuestion: 'Total match time of the main event, in minutes',

@@ -95,7 +95,9 @@ export function questionsByDay(game: Game): Array<{
 }>
 ```
 
-Lives in `src/lib/scoring.ts` alongside `questionIds` (pure, no Firebase). When `dayCount <= 1` it returns a single unlabelled group, letting callers use one code path for both cases.
+Lives in its own module, **`src/lib/nights.ts`** — deliberately *not* in `scoring.ts`. The two `scoring.ts` files must stay mirrors because a divergence there yields wrong Pop Counts; this is a presentation helper whose worst failure is a cosmetically odd grouping. Keeping it out avoids expanding that high-stakes mirror surface. The server-side email does its own two-line grouping on the same `day` field rather than sharing an abstraction.
+
+When `dayCount <= 1` it returns a single unlabelled group, letting callers use one code path for both cases.
 
 ### 3. Game Builder
 
@@ -119,8 +121,9 @@ Same helper, same grouping, all read-only:
 
 - `LiveControlPanel` — night headings over the results-entry list.
 - `PopRankings` "Your Picks" — night headings.
-- `GameResultsBoard` / `GameResultsModal` — night headings.
-- Recap email (`functions/src/index.ts`) — results listed under night headings.
+- `PlayersPanel` — night headings in the per-player picks modal.
+
+**Corrected during implementation.** `GameResultsBoard` / `GameResultsModal` and the recap email were originally listed here, but neither renders a question list — both show *standings* (ranked players and their Pop Counts). There is nothing in them to group by night, so they are unchanged. `PlayersPanel`, which was missed in the original list, does render questions and is grouped instead.
 
 ## Design — Story 2: interim standings email
 

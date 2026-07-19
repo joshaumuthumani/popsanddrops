@@ -3,8 +3,10 @@ import type { Game, Submission } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useSubmissions, useResults } from '@/hooks/data';
 import { tally } from '@/lib/scoring';
+import { questionsByDay } from '@/lib/nights';
 import { Avatar } from '@/components/Avatar';
 import { Modal } from '@/components/Modal';
+import { NightHeading } from '@/components/primitives';
 import { PopDropPill, type GradeState } from '@/components/PopDropPill';
 import { initialsFromName } from '@/lib/format';
 
@@ -33,10 +35,15 @@ export function PlayersPanel({ game }: { game: Game }) {
     return tb - ta;
   });
 
-  const allQuestions = [
-    ...game.matches.map((m) => ({ id: m.id, name: m.name })),
-    ...game.propBets.map((p) => ({ id: p.id, name: p.question })),
-  ];
+  // Grouped by night so a two-night card's pick list stays readable. Single-night games
+  // return one unlabelled group, matching the previous flat rendering exactly.
+  const nights = questionsByDay(game).map((n) => ({
+    ...n,
+    questions: [
+      ...n.matches.map((m) => ({ id: m.id, name: m.name })),
+      ...n.propBets.map((p) => ({ id: p.id, name: p.question })),
+    ],
+  }));
   const pickOf = (s: Submission, id: string) => s.matchPicks[id] ?? s.propBetPicks[id];
 
   return (
@@ -86,29 +93,34 @@ export function PlayersPanel({ game }: { game: Game }) {
       {selected && (
         <Modal onClose={() => setSelected(null)} title={`${selected.displayName ?? 'Player'} · picks`}>
           <div className="flex flex-col gap-2.5">
-            {allQuestions.map((q) => {
-              const pick = pickOf(selected, q.id);
-              const state = grade(pick, results[q.id]);
-              const popped = state === 'pop';
-              return (
-                <div
-                  key={q.id}
-                  className="flex items-center justify-between gap-3"
-                  style={{
-                    background: popped ? 'rgba(231,201,47,.1)' : 'rgba(255,255,255,.03)',
-                    border: `1px solid ${popped ? 'rgba(231,201,47,.3)' : 'rgba(255,255,255,.06)'}`,
-                    borderRadius: 12,
-                    padding: '12px 14px',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: '#6B7A99' }}>{q.name}</div>
-                    <div style={{ fontWeight: 800, fontSize: 14.5 }}>{pick ?? '—'}</div>
-                  </div>
-                  <PopDropPill state={state} />
-                </div>
-              );
-            })}
+            {nights.map((night) => (
+              <div key={night.day} className="flex flex-col gap-2.5">
+                {night.label && <NightHeading label={night.label} style={{ margin: '6px 0 2px' }} />}
+                {night.questions.map((q) => {
+                  const pick = pickOf(selected, q.id);
+                  const state = grade(pick, results[q.id]);
+                  const popped = state === 'pop';
+                  return (
+                    <div
+                      key={q.id}
+                      className="flex items-center justify-between gap-3"
+                      style={{
+                        background: popped ? 'rgba(231,201,47,.1)' : 'rgba(255,255,255,.03)',
+                        border: `1px solid ${popped ? 'rgba(231,201,47,.3)' : 'rgba(255,255,255,.06)'}`,
+                        borderRadius: 12,
+                        padding: '12px 14px',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: '#6B7A99' }}>{q.name}</div>
+                        <div style={{ fontWeight: 800, fontSize: 14.5 }}>{pick ?? '—'}</div>
+                      </div>
+                      <PopDropPill state={state} />
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
             <div
               className="flex items-center justify-between gap-3"
               style={{ background: 'rgba(231,201,47,.06)', border: '1px solid rgba(231,201,47,.22)', borderRadius: 12, padding: '12px 14px' }}

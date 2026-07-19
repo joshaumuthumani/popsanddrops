@@ -29,6 +29,33 @@ export function SectionLabel({ children, style }: { children: ReactNode; style?:
   );
 }
 
+/**
+ * Night divider for multi-night cards, e.g. "NIGHT 1". Sits ABOVE the Match/Prop section
+ * labels, so it's deliberately larger and uses the display face — the hierarchy has to read
+ * as "night contains sections", not the other way round. Never rendered for single-night
+ * games (questionsByDay returns an empty label).
+ */
+export function NightHeading({ label, style }: { label: string; style?: CSSProperties }) {
+  return (
+    <div className="flex items-center gap-3" style={{ margin: '10px 0 16px', ...style }}>
+      <span
+        className="uppercase whitespace-nowrap"
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontWeight: 400,
+          fontSize: 26,
+          lineHeight: 1,
+          letterSpacing: '.04em',
+          color: '#77E0E8',
+        }}
+      >
+        {label}
+      </span>
+      <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(119,224,232,.35),transparent)' }} />
+    </div>
+  );
+}
+
 /** Cyan eyebrow above page titles, e.g. "USER APP · PARTICIPANT". */
 export function Eyebrow({ children }: { children: ReactNode }) {
   return (
