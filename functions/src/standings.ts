@@ -85,12 +85,25 @@ export const sendNightStandings = onCall<{ gameId?: string; night?: number }>(as
     );
   }
 
+  // Nobody has submitted picks yet, so there are no standings and nobody to mail. This must
+  // be checked BEFORE claiming the night below: sendStandingsEmail no-ops on an empty
+  // leaderboard, so claiming first would burn the send permanently on a premature click and
+  // leave the button disabled forever once players did submit.
+  const boardSnap = await db.doc(`games/${gameId}/leaderboard/current`).get();
+  const entryCount = ((boardSnap.data()?.entries as unknown[]) ?? []).length;
+  if (entryCount === 0) {
+    throw new HttpsError(
+      'failed-precondition',
+      'No one has submitted picks for this game yet, so there are no standings to send.',
+    );
+  }
+
   // Claim the night BEFORE sending. If the send partially fails we'd rather under-send than
   // let a retry mail everyone a second time; per-recipient failures are logged to emailLog.
   await gameSnap.ref.update({ standingsSentFor: FieldValue.arrayUnion(night) });
 
   await sendStandingsEmail(gameId, game, 'interim', night);
-  logger.info(`Night ${night} standings sent for game ${gameId} by ${uid}.`);
+  logger.info(`Night ${night} standings sent for game ${gameId} to ${entryCount} player(s) by ${uid}.`);
 
-  return { sent: true, night };
+  return { sent: true, night, recipients: entryCount };
 });
