@@ -76,16 +76,18 @@ export function UserDashboard() {
       {loading ? (
         <p className="text-muted">Loading your challenges…</p>
       ) : joined.length === 0 ? (
+        // Joining comes FIRST for someone with no games — it's the only thing they can act
+        // on. The pod's latest result is context, and burying the CTA under a leaderboard
+        // put the one useful control at the bottom of the page.
         <>
-          {latestResult}
-          <div style={{ marginTop: latestResult ? 24 : 0 }}>
-            <EmptyState
-              title="Jump into the action"
-              body="Got a join code from your pod's organizer? Enter it to play the next challenge."
-              ctaLabel="Enter a join code"
-              to="/join"
-            />
-          </div>
+          <EmptyState
+            title="Jump into the action"
+            body="Got a join code from your pod's organizer? Enter it to play the next challenge."
+            ctaLabel="Enter a join code"
+            to="/join"
+          />
+          {/* latestResult's own top margin assumes it leads the page; it now follows the CTA. */}
+          {latestResult && <div style={{ marginTop: 30 }}>{latestResult}</div>}
         </>
       ) : (
         <>
