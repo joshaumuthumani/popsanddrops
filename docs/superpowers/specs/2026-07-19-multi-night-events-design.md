@@ -128,7 +128,11 @@ Depends on Story 1 (there is no "night" to report on without it).
 
 - **Trigger:** an admin button, one per night, in the admin game panel. Enabled only when every question for that night has a result recorded, and never for the final night (that night's report is the existing recap email).
 - **Single-send guard:** the game document records which nights have been reported, e.g. `standingsSentFor: number[]`. The button disables once its night is listed. This matters because — unlike `onGameClose`, which fires on a one-way `status → CLOSED` transition — nothing else prevents an admin from mailing the whole pod twice.
-- **Delivery:** a new callable function reusing the existing Resend configuration (`RESEND_API_KEY`, `RESEND_FROM`, `APP_PUBLIC_URL`) and the same per-recipient failure logging to `emailLog` that the recap email uses.
+- **Delivery — how much is reused.** The *sending* is largely existing code; the *trigger* is not.
+  - **Reused:** `sendResultsEmail()` already reads `leaderboard/current`, loops recipients, resolves each address, posts to Resend, and logs per-recipient failures to `emailLog`. Extract it to `sendStandingsEmail(gameId, game, variant)` with `variant: 'interim' | 'final'`; the existing close path calls it with `'final'`. One new template, same plumbing.
+  - **No recompute needed:** `onResultWrite` already keeps `leaderboard/current` current, so standings are read, not recalculated.
+  - **New:** a callable export. `onGameClose` is a Firestore trigger on `status → CLOSED`; an admin-initiated send has no document transition to hang off, and the client cannot send directly because `RESEND_API_KEY` is server-only.
+  - **Deliberately *not* shared:** any of `closeGame()`'s status handling. Closed games are frozen for everyone, so an interim send must leave the game mid-show and still gradeable. It never touches `status`.
 - **Content:** a shorter template than the recap — current leader, top 3 by Pop Count, the sender's own standing, and a line noting the remaining night is still to play. Copy uses **Pop / Drop / Pop Count / Pop Rankings** only.
 - Standings are computed from the existing leaderboard document, so no new scoring path is introduced.
 
