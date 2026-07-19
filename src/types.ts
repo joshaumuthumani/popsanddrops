@@ -26,6 +26,8 @@ export interface Match {
    * app never depends on a third-party CDN. Optional: matches may have no poster.
    */
   posterUrl?: string;
+  /** 1-based night this match belongs to on a multi-night card. Absent ⇒ night 1. */
+  day?: number;
 }
 
 /** A prop bet — pick one answer from the options. */
@@ -33,6 +35,8 @@ export interface PropBet {
   id: string;
   question: string;
   options: string[];
+  /** 1-based night this prop belongs to on a multi-night card. Absent ⇒ night 1. */
+  day?: number;
 }
 
 export interface Game {
@@ -41,8 +45,19 @@ export interface Game {
   promotion: string;
   /** ISO date string for the event. */
   eventDate: string;
-  /** Epoch millis when picks lock. Source of truth for the countdown. */
+  /**
+   * Epoch millis when picks lock. Source of truth for the countdown. One lock for the
+   * whole game even on multi-night cards — nights are a presentational grouping, not an
+   * access boundary (see docs/superpowers/specs/2026-07-19-multi-night-events-design.md).
+   */
   lockTime: number;
+  /** How many nights the event runs. 1 for a normal single-night card. */
+  dayCount: number;
+  /**
+   * Nights whose interim standings email has already gone out. Written server-side by the
+   * sendNightStandings callable so a retry can't mail the whole pod twice.
+   */
+  standingsSentFor?: number[];
   status: GameStatus;
   matches: Match[];
   propBets: PropBet[];

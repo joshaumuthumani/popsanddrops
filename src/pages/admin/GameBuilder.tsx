@@ -13,6 +13,8 @@ interface DraftQuestion {
   options: string[];
   /** Matches only — a Storage URL for the match poster. Prop bets never carry one. */
   posterUrl?: string;
+  /** 1-based night. Only meaningful when the game runs more than one night. */
+  day?: number;
 }
 
 const newId = () => Math.random().toString(36).slice(2, 8);
@@ -37,6 +39,7 @@ function QuestionBuilder({
   setQuestions,
   withPoster = false,
   uid,
+  dayCount = 1,
 }: {
   title: string;
   optionLabel: string;
@@ -45,6 +48,8 @@ function QuestionBuilder({
   /** Matches get a poster control; prop bets don't (PRD scope). */
   withPoster?: boolean;
   uid?: string;
+  /** Night selectors only appear once the event runs more than one night. */
+  dayCount?: number;
 }) {
   const update = (idx: number, patch: Partial<DraftQuestion>) =>
     setQuestions(questions.map((q, i) => (i === idx ? { ...q, ...patch } : q)));
@@ -69,6 +74,20 @@ function QuestionBuilder({
                 onChange={(e) => update(idx, { label: e.target.value })}
                 style={inputStyle}
               />
+              {dayCount > 1 && (
+                <select
+                  value={q.day ?? 1}
+                  onChange={(e) => update(idx, { day: Number(e.target.value) })}
+                  style={{ ...inputStyle, width: 'auto', flex: 'none', cursor: 'pointer' }}
+                  title="Which night this runs on"
+                >
+                  {Array.from({ length: dayCount }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      Night {i + 1}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button
                 onClick={() => setQuestions(questions.filter((_, i) => i !== idx))}
                 className="cursor-pointer bg-transparent"
@@ -129,12 +148,26 @@ export function GameBuilder() {
   const [eventDate, setEventDate] = useState('');
   const [lockTime, setLockTime] = useState('');
   const [tiebreaker, setTiebreaker] = useState('');
+  const [dayCount, setDayCount] = useState(1);
   const [matches, setMatches] = useState<DraftQuestion[]>([{ id: newId(), label: '', options: ['', ''] }]);
   const [props, setProps] = useState<DraftQuestion[]>([{ id: newId(), label: '', options: ['Yes', 'No'] }]);
   const [toastOpen, setToastOpen] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [newGameId, setNewGameId] = useState<string | null>(null);
+
+  /**
+   * Changing the night count clamps every question into range. Lowering it moves questions
+   * from removed nights down to the new last night rather than dropping them — silently
+   * losing a question an admin typed would be far worse than putting it on the wrong night.
+   */
+  const changeDayCount = (next: number) => {
+    const n = Math.max(1, Math.min(6, Math.floor(next) || 1));
+    setDayCount(n);
+    const clamp = (qs: DraftQuestion[]) => qs.map((q) => ({ ...q, day: Math.min(q.day ?? 1, n) }));
+    setMatches(clamp);
+    setProps(clamp);
+  };
 
   // DraftQuestion -> domain question, dropping blank options/rows.
   const cleanQuestions = (qs: DraftQuestion[]) =>
@@ -144,6 +177,7 @@ export function GameBuilder() {
         label: q.label.trim(),
         options: q.options.map((o) => o.trim()).filter(Boolean),
         posterUrl: q.posterUrl,
+        day: q.day,
       }))
       .filter((q) => q.label && q.options.length >= 2);
 
@@ -178,15 +212,23 @@ export function GameBuilder() {
           promotion,
           eventDate,
           lockTime: lockMs,
+          dayCount,
           tiebreakerQuestion: tiebreaker,
-          // Spread the poster only when set — Firestore rejects explicit `undefined`.
+          // Spread poster/day only when meaningful — Firestore rejects explicit `undefined`,
+          // and single-night games shouldn't carry a redundant `day: 1` on every question.
           matches: cleanMatches.map((m) => ({
             id: m.id,
             name: m.label,
             options: m.options,
             ...(m.posterUrl ? { posterUrl: m.posterUrl } : {}),
+            ...(dayCount > 1 ? { day: m.day ?? 1 } : {}),
           })),
-          propBets: cleanProps.map((p) => ({ id: p.id, question: p.label, options: p.options })),
+          propBets: cleanProps.map((p) => ({
+            id: p.id,
+            question: p.label,
+            options: p.options,
+            ...(dayCount > 1 ? { day: p.day ?? 1 } : {}),
+          })),
         },
         user,
       );
@@ -223,11 +265,34 @@ export function GameBuilder() {
             <label style={labelStyle}>Picks lock at</label>
             <input type="datetime-local" value={lockTime} onChange={(e) => setLockTime(e.target.value)} style={inputStyle} />
           </div>
+          <div>
+            <label style={labelStyle}>Nights</label>
+            {/* A dropdown, not a number input: a controlled number field that clamps on every
+                keystroke can't be typed into — "1" + "2" becomes "12", clamps, and lands on
+                something you didn't ask for, and clearing it snaps straight back to 1. */}
+            <select
+              value={dayCount}
+              onChange={(e) => changeDayCount(Number(e.target.value))}
+              style={{ ...inputStyle, cursor: 'pointer' }}
+            >
+              {Array.from({ length: 6 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>
+                  {i + 1} {i === 0 ? 'night' : 'nights'}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+        {dayCount > 1 && (
+          <p style={{ color: '#6B7A99', fontSize: 12.5, marginTop: 12, marginBottom: 0 }}>
+            It's still one game — picks for every night lock together at the time above. Assign
+            each question to a night below.
+          </p>
+        )}
       </Card>
 
-      <QuestionBuilder title="Match predictions" optionLabel="Match" questions={matches} setQuestions={setMatches} withPoster uid={user?.uid} />
-      <QuestionBuilder title="Prop bets" optionLabel="Prop bet" questions={props} setQuestions={setProps} />
+      <QuestionBuilder title="Match predictions" optionLabel="Match" questions={matches} setQuestions={setMatches} withPoster uid={user?.uid} dayCount={dayCount} />
+      <QuestionBuilder title="Prop bets" optionLabel="Prop bet" questions={props} setQuestions={setProps} dayCount={dayCount} />
 
       <Card style={{ padding: 18, marginBottom: 22 }}>
         <label style={labelStyle}>Tiebreaker question</label>

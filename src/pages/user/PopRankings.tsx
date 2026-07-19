@@ -1,8 +1,10 @@
+import { useMemo } from 'react';
 import type { Game, LeaderboardEntry, Submission } from '@/types';
-import { SectionLabel, StatCard } from '@/components/primitives';
+import { NightHeading, SectionLabel, StatCard } from '@/components/primitives';
 import { PopDropPill, type GradeState } from '@/components/PopDropPill';
 import { PopRankingsTable } from '@/components/PopRankingsTable';
 import { tally } from '@/lib/scoring';
+import { questionsByDay } from '@/lib/nights';
 
 interface Props {
   game: Game;
@@ -28,6 +30,7 @@ const colHeader = {
 /** USER · LIVE BOARD — Pop Count / rank / graded stat cards, your picks (matches | props),
  *  live Pop Rankings. Spectators (no submission) still see the board. */
 export function PopRankings({ game, submission, results, leaderboard, meUid }: Props) {
+  const nights = useMemo(() => questionsByDay(game), [game]);
   const totalQuestions = game.matches.length + game.propBets.length;
   const gradedCount =
     game.matches.filter((m) => results[m.id] !== undefined && results[m.id] !== '').length +
@@ -78,24 +81,29 @@ export function PopRankings({ game, submission, results, leaderboard, meUid }: P
       {submission && (
         <div style={{ marginBottom: 26 }}>
           <SectionLabel style={{ marginBottom: 14 }}>Your picks</SectionLabel>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 18 }}>
-            {game.matches.length > 0 && (
-              <div>
-                <div className="uppercase" style={colHeader}>Matches</div>
-                <div className="flex flex-col gap-2.5">
-                  {game.matches.map((m) => pickRow(m.id, m.name, submission.matchPicks[m.id]))}
-                </div>
+          {nights.map((night) => (
+            <div key={night.day} style={{ marginBottom: nights.length > 1 ? 20 : 0 }}>
+              {night.label && <NightHeading label={night.label} style={{ margin: '4px 0 12px' }} />}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 18 }}>
+                {night.matches.length > 0 && (
+                  <div>
+                    <div className="uppercase" style={colHeader}>Matches</div>
+                    <div className="flex flex-col gap-2.5">
+                      {night.matches.map((m) => pickRow(m.id, m.name, submission.matchPicks[m.id]))}
+                    </div>
+                  </div>
+                )}
+                {night.propBets.length > 0 && (
+                  <div>
+                    <div className="uppercase" style={colHeader}>Prop bets</div>
+                    <div className="flex flex-col gap-2.5">
+                      {night.propBets.map((p) => pickRow(p.id, p.question, submission.propBetPicks[p.id]))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-            {game.propBets.length > 0 && (
-              <div>
-                <div className="uppercase" style={colHeader}>Prop bets</div>
-                <div className="flex flex-col gap-2.5">
-                  {game.propBets.map((p) => pickRow(p.id, p.question, submission.propBetPicks[p.id]))}
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          ))}
         </div>
       )}
 

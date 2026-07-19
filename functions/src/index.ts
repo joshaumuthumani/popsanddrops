@@ -2,6 +2,7 @@
 //   • onResultWrite        — recompute Pop/Drop scores + leaderboard on every result entry.
 //   • onGameClose          — on status -> CLOSED, apply the tiebreaker and email final results.
 //   • ingestPosterFromUrl  — re-host a pasted match-poster link into our own Storage bucket.
+//   • sendNightStandings   — admin-triggered interim standings for a multi-night card.
 // The leaderboard doc lives at games/{gameId}/leaderboard/current (single doc, single listener).
 
 import { onDocumentWritten, onDocumentUpdated } from 'firebase-functions/v2/firestore';
@@ -17,6 +18,8 @@ const db = getFirestore();
 
 // Match-poster URL ingest lives in its own module; re-exported so it deploys with the rest.
 export { ingestPosterFromUrl } from './posters';
+// Admin-triggered interim standings for multi-night cards.
+export { sendNightStandings } from './standings';
 
 /** Reads a game's submissions + results, writes back per-submission scores and the leaderboard doc. */
 async function recomputeGame(gameId: string): Promise<void> {
@@ -66,13 +69,24 @@ export const onGameClose = onDocumentUpdated('games/{gameId}', async (event) => 
 
   const gameId = event.params.gameId;
   await recomputeGame(gameId); // status is now CLOSED, so the tiebreaker is applied
-  await sendResultsEmail(gameId, after as GameDoc & { name?: string; eventDate?: string });
+  await sendStandingsEmail(gameId, after as GameDoc & { name?: string; eventDate?: string }, 'final');
 });
 
-/** Sends the Final Pops email via Resend (Phase 2). No-ops with a log if Resend isn't configured. */
-async function sendResultsEmail(
+/**
+ * Sends a standings email via Resend (Phase 2). No-ops with a log if Resend isn't configured.
+ *
+ * Two variants share this plumbing:
+ *   • 'final'   — the recap after a game closes (onGameClose).
+ *   • 'interim' — mid-event standings after one night is graded (sendNightStandings).
+ *
+ * Standings are READ from the leaderboard doc, never recomputed here: onResultWrite already
+ * keeps games/{id}/leaderboard/current up to date on every result entry.
+ */
+export async function sendStandingsEmail(
   gameId: string,
   game: GameDoc & { name?: string; eventDate?: string },
+  variant: 'final' | 'interim',
+  night?: number,
 ): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM ?? 'Pops & Drops <noreply@popsanddrops.us>';
@@ -90,18 +104,33 @@ async function sendResultsEmail(
   }
 
   const top3 = entries.filter((e) => e.rank <= 3).slice(0, 3);
-  const winner = entries.find((e) => e.rank === 1);
+  const leader = entries.find((e) => e.rank === 1);
   const scoreboardLink = `${appUrl}/app/game/${gameId}`;
   const gameName = game.name ?? 'the challenge';
+  const isInterim = variant === 'interim';
 
   const top3Html = top3
     .map((e) => `<tr><td style="padding:4px 12px">#${e.rank}</td><td style="padding:4px 12px">${escapeHtml(e.displayName)}</td><td style="padding:4px 12px"><strong>${e.popCount}</strong> Pops</td></tr>`)
     .join('');
+
+  const heading = isInterim
+    ? `Night ${night} standings — ${escapeHtml(gameName)}`
+    : `Final Pops — ${escapeHtml(gameName)}`;
+  const leadLine = leader
+    ? isInterim
+      ? `<p>🔥 <strong>${escapeHtml(leader.displayName)}</strong> leads with ${leader.popCount} Pops going into the next night.</p>`
+      : `<p>🏆 <strong>${escapeHtml(leader.displayName)}</strong> takes it with ${leader.popCount} Pops. Congrats!</p>`
+    : '';
+  const tail = isInterim
+    ? `<p style="color:#555">Picks are already locked — there's still a night to play, so the board can still move.</p>`
+    : '';
+
   const html = `
     <div style="font-family:system-ui,sans-serif;max-width:520px">
-      <h2>Final Pops — ${escapeHtml(gameName)}</h2>
-      ${winner ? `<p>🏆 <strong>${escapeHtml(winner.displayName)}</strong> takes it with ${winner.popCount} Pops. Congrats!</p>` : ''}
+      <h2>${heading}</h2>
+      ${leadLine}
       <table style="border-collapse:collapse">${top3Html}</table>
+      ${tail}
       <p><a href="${scoreboardLink}">View the full Pop Rankings →</a></p>
       <p style="color:#8a8a8a;font-size:12px;margin-top:28px;border-top:1px solid #e5e5e5;padding-top:12px">
         This is an automated message from Pops & Drops — please do not reply, this inbox is not monitored.
@@ -118,7 +147,12 @@ async function sendResultsEmail(
         const res = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from, to: email, subject: `Final Results — ${gameName}`, html }),
+          body: JSON.stringify({
+            from,
+            to: email,
+            subject: isInterim ? `Night ${night} Standings — ${gameName}` : `Final Results — ${gameName}`,
+            html,
+          }),
         });
         if (!res.ok) {
           const body = await res.text();
@@ -133,9 +167,9 @@ async function sendResultsEmail(
       }
     }),
   );
-  logger.info(`Results emails dispatched for game ${gameId}.`);
+  logger.info(`${variant} standings emails dispatched for game ${gameId}.`);
 }
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
