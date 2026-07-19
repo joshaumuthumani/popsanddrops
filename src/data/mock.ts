@@ -28,7 +28,15 @@ export const MOCK_GAME: Game = {
   createdBy: 'u-you',
   createdAt: Date.now() - 86_400_000 * 3,
   matches: [
-    { id: 'm1', name: 'AEW WORLD CHAMPIONSHIP', options: ['Swerve Strickland', 'Will Ospreay'] },
+    {
+      id: 'm1',
+      name: 'AEW WORLD CHAMPIONSHIP',
+      options: ['Swerve Strickland', 'Will Ospreay'],
+      // Demo mode has no Storage, so this stands in as an inline SVG — it keeps the poster
+      // render path visible in Phase-0 without reaching for a third-party image.
+      posterUrl:
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23022f84'/%3E%3Cstop offset='1' stop-color='%23c0392b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='320' height='180' fill='url(%23g)'/%3E%3Ctext x='160' y='96' font-family='sans-serif' font-size='15' font-weight='700' fill='rgba(255,255,255,.6)' text-anchor='middle' letter-spacing='3'%3EMATCH POSTER%3C/text%3E%3C/svg%3E",
+    },
     { id: 'm2', name: 'AEW INTERNATIONAL CHAMPIONSHIP', options: ['Konosuke Takeshita', 'Kyle Fletcher'] },
     { id: 'm3', name: "AEW WOMEN'S WORLD TITLE", options: ['Toni Storm', 'Mariah May'] },
     { id: 'm4', name: 'AEW TNT CHAMPIONSHIP', options: ['Jon Moxley', 'Darby Allin'] },
@@ -37,6 +45,10 @@ export const MOCK_GAME: Game = {
       id: 'm6',
       name: 'AEW CASINO GAUNTLET · WINNER',
       options: ['“Hangman” Adam Page', 'Kazuchika Okada', 'MJF', 'Orange Cassidy'],
+      // Second demo poster, on a 4-option match — exercises the case where the choices
+      // stack taller than the poster.
+      posterUrl:
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Cdefs%3E%3ClinearGradient id='g2' x1='0' y1='1' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%230b52a1'/%3E%3Cstop offset='1' stop-color='%23c9a91f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='320' height='180' fill='url(%23g2)'/%3E%3Ctext x='160' y='96' font-family='sans-serif' font-size='14' font-weight='700' fill='rgba(0,0,0,.45)' text-anchor='middle' letter-spacing='3'%3EGAUNTLET%3C/text%3E%3C/svg%3E",
     },
   ],
   propBets: [

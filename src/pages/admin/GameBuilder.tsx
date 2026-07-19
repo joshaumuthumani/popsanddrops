@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, PageTitle, SectionLabel, GoldButton } from '@/components/primitives';
+import { PosterPicker } from '@/components/PosterPicker';
 import { Toast } from '@/components/Toast';
 import { useAuth } from '@/context/AuthContext';
 import { createGame } from '@/lib/store';
@@ -10,6 +11,8 @@ interface DraftQuestion {
   id: string;
   label: string;
   options: string[];
+  /** Matches only — a Storage URL for the match poster. Prop bets never carry one. */
+  posterUrl?: string;
 }
 
 const newId = () => Math.random().toString(36).slice(2, 8);
@@ -32,11 +35,16 @@ function QuestionBuilder({
   optionLabel,
   questions,
   setQuestions,
+  withPoster = false,
+  uid,
 }: {
   title: string;
   optionLabel: string;
   questions: DraftQuestion[];
   setQuestions: (q: DraftQuestion[]) => void;
+  /** Matches get a poster control; prop bets don't (PRD scope). */
+  withPoster?: boolean;
+  uid?: string;
 }) {
   const update = (idx: number, patch: Partial<DraftQuestion>) =>
     setQuestions(questions.map((q, i) => (i === idx ? { ...q, ...patch } : q)));
@@ -47,6 +55,13 @@ function QuestionBuilder({
       <div className="flex flex-col gap-3">
         {questions.map((q, idx) => (
           <Card key={q.id} style={{ padding: 16 }}>
+            {withPoster && (
+              <PosterPicker
+                value={q.posterUrl}
+                uid={uid}
+                onChange={(posterUrl) => update(idx, { posterUrl })}
+              />
+            )}
             <div className="flex items-center gap-2 mb-3">
               <input
                 placeholder={`${optionLabel} name`}
@@ -124,7 +139,12 @@ export function GameBuilder() {
   // DraftQuestion -> domain question, dropping blank options/rows.
   const cleanQuestions = (qs: DraftQuestion[]) =>
     qs
-      .map((q) => ({ id: q.id, label: q.label.trim(), options: q.options.map((o) => o.trim()).filter(Boolean) }))
+      .map((q) => ({
+        id: q.id,
+        label: q.label.trim(),
+        options: q.options.map((o) => o.trim()).filter(Boolean),
+        posterUrl: q.posterUrl,
+      }))
       .filter((q) => q.label && q.options.length >= 2);
 
   const publish = async () => {
@@ -159,7 +179,13 @@ export function GameBuilder() {
           eventDate,
           lockTime: lockMs,
           tiebreakerQuestion: tiebreaker,
-          matches: cleanMatches.map((m) => ({ id: m.id, name: m.label, options: m.options })),
+          // Spread the poster only when set — Firestore rejects explicit `undefined`.
+          matches: cleanMatches.map((m) => ({
+            id: m.id,
+            name: m.label,
+            options: m.options,
+            ...(m.posterUrl ? { posterUrl: m.posterUrl } : {}),
+          })),
           propBets: cleanProps.map((p) => ({ id: p.id, question: p.label, options: p.options })),
         },
         user,
@@ -200,7 +226,7 @@ export function GameBuilder() {
         </div>
       </Card>
 
-      <QuestionBuilder title="Match predictions" optionLabel="Match" questions={matches} setQuestions={setMatches} />
+      <QuestionBuilder title="Match predictions" optionLabel="Match" questions={matches} setQuestions={setMatches} withPoster uid={user?.uid} />
       <QuestionBuilder title="Prop bets" optionLabel="Prop bet" questions={props} setQuestions={setProps} />
 
       <Card style={{ padding: 18, marginBottom: 22 }}>

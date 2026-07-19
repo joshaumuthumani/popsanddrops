@@ -20,6 +20,12 @@ export interface Match {
   /** Short label shown above the options, e.g. "AEW WORLD CHAMPIONSHIP". */
   name: string;
   options: string[];
+  /**
+   * Match poster, rendered as a 16:9 banner atop the pick card. Always a Firebase
+   * Storage download URL — pasted links are re-hosted (see src/lib/posters.ts) so the
+   * app never depends on a third-party CDN. Optional: matches may have no poster.
+   */
+  posterUrl?: string;
 }
 
 /** A prop bet — pick one answer from the options. */
