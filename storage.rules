@@ -1,0 +1,45 @@
+rules_version = '2';
+
+// Pops & Drops — Cloud Storage rules.
+//
+// The only user-supplied binaries in this app are match posters. Posters are chosen in the
+// Game Builder BEFORE the game document exists, so they are keyed by the uploading admin
+// rather than by game id — see docs/superpowers/specs/2026-07-18-match-posters-design.md.
+//
+// Role is resolved from Firestore exactly the way firestore.rules does it, so the shared-admin
+// model holds here too: ANY admin may upload, there is no per-game scoping.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return signedIn() && role() in ['admin', 'superadmin'];
+    }
+
+    // Enforced server-side, not merely in the client: the client downscales before upload,
+    // but these rules are what actually keep junk out of the bucket.
+    function isBoundedImage() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // Match posters. Readable by any signed-in user because they render on the picks screen.
+    match /posters/{uid}/{imageId} {
+      allow read: if signedIn();
+      allow write: if isAdmin() && isBoundedImage();
+    }
+
+    // Nothing else is writable from the client.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

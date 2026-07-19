@@ -1,6 +1,7 @@
 // Pops & Drops Cloud Functions (PRD §8.2). Deployed to us-west1 to sit next to Firestore.
-//   • onResultWrite — recompute Pop/Drop scores + leaderboard on every result entry.
-//   • onGameClose   — on status -> CLOSED, apply the tiebreaker and email final results.
+//   • onResultWrite        — recompute Pop/Drop scores + leaderboard on every result entry.
+//   • onGameClose          — on status -> CLOSED, apply the tiebreaker and email final results.
+//   • ingestPosterFromUrl  — re-host a pasted match-poster link into our own Storage bucket.
 // The leaderboard doc lives at games/{gameId}/leaderboard/current (single doc, single listener).
 
 import { onDocumentWritten, onDocumentUpdated } from 'firebase-functions/v2/firestore';
@@ -13,6 +14,9 @@ import { computeLeaderboard, type GameDoc, type Results, type SubmissionDoc } fr
 initializeApp();
 setGlobalOptions({ region: 'us-west1' });
 const db = getFirestore();
+
+// Match-poster URL ingest lives in its own module; re-exported so it deploys with the rest.
+export { ingestPosterFromUrl } from './posters';
 
 /** Reads a game's submissions + results, writes back per-submission scores and the leaderboard doc. */
 async function recomputeGame(gameId: string): Promise<void> {

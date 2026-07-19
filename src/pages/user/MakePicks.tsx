@@ -95,7 +95,24 @@ export function MakePicks({
         {game.matches.map((m) => {
           const multi = m.options.length > 2;
           return (
-            <Card key={m.id} style={{ padding: '16px 18px' }}>
+            <Card key={m.id} style={{ padding: 0, overflow: 'hidden' }}>
+              {m.posterUrl && (
+                <img
+                  src={m.posterUrl}
+                  alt={m.name}
+                  loading="lazy"
+                  // 16:9 holds on narrow screens; the height cap stops the banner from
+                  // becoming ~750px tall on a full-width desktop card.
+                  style={{
+                    width: '100%',
+                    aspectRatio: '16 / 9',
+                    maxHeight: 260,
+                    objectFit: 'cover',
+                    display: 'block',
+                  }}
+                />
+              )}
+              <div style={{ padding: '16px 18px' }}>
               <div className="flex items-center justify-between gap-2.5" style={{ marginBottom: 12 }}>
                 <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#6B7A99' }}>{m.name}</span>
                 {multi && (
@@ -141,6 +158,7 @@ export function MakePicks({
                   </PickButton>
                 </div>
               )}
+              </div>
             </Card>
           );
         })}
