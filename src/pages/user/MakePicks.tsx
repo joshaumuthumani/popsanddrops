@@ -1,9 +1,115 @@
 import { useMemo, useState } from 'react';
-import type { Game } from '@/types';
+import type { Game, Match } from '@/types';
 import { Card, GoldButton, LiveBanner, SectionLabel } from '@/components/primitives';
 import { PickButton } from '@/components/PickButton';
 import { Countdown } from '@/components/Countdown';
 import { Toast } from '@/components/Toast';
+
+interface MatchCardProps {
+  match: Match;
+  selected?: string;
+  onPick: (option: string) => void;
+}
+
+/** Match name, plus a "pick 1 of N" hint once there are more than two competitors. */
+function MatchHeader({ match, centered }: { match: Match; centered: boolean }) {
+  return (
+    <div
+      className={`flex items-center gap-2.5 flex-wrap ${centered ? 'justify-center' : 'justify-between'}`}
+      style={{ marginBottom: 12 }}
+    >
+      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#6B7A99' }}>{match.name}</span>
+      {match.options.length > 2 && (
+        <span
+          style={{
+            fontSize: 9.5,
+            fontWeight: 800,
+            letterSpacing: '.08em',
+            color: '#77E0E8',
+            background: 'rgba(119,224,232,.12)',
+            padding: '3px 8px',
+            borderRadius: 999,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          PICK 1 OF {match.options.length}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The pick controls. Two-competitor matches normally sit side by side with a VS between
+ * them; alongside a poster there isn't the width for that, so they stack instead.
+ */
+function MatchOptions({ match, selected, onPick, stacked }: MatchCardProps & { stacked: boolean }) {
+  if (match.options.length > 2) {
+    return (
+      <div className="flex flex-col gap-2">
+        {match.options.map((opt) => (
+          <PickButton key={opt} align="left" selected={selected === opt} onClick={() => onPick(opt)}>
+            {opt}
+          </PickButton>
+        ))}
+      </div>
+    );
+  }
+
+  const [a, b] = match.options;
+  const vs = (
+    <span className="text-center" style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: '#6B7A99' }}>
+      VS
+    </span>
+  );
+
+  if (stacked) {
+    return (
+      <div className="flex flex-col" style={{ gap: 7 }}>
+        <PickButton selected={selected === a} onClick={() => onPick(a)}>{a}</PickButton>
+        {vs}
+        <PickButton selected={selected === b} onClick={() => onPick(b)}>{b}</PickButton>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 34px 1fr', gap: 10, alignItems: 'center' }}>
+      <PickButton selected={selected === a} onClick={() => onPick(a)}>{a}</PickButton>
+      {vs}
+      <PickButton selected={selected === b} onClick={() => onPick(b)}>{b}</PickButton>
+    </div>
+  );
+}
+
+/**
+ * One match. With a poster the card splits — art on the left, choices stacked on the right
+ * (collapsing to poster-on-top when narrow). Without one it renders as it always has.
+ */
+function MatchCard({ match, selected, onPick }: MatchCardProps) {
+  if (!match.posterUrl) {
+    return (
+      <Card style={{ padding: '16px 18px' }}>
+        <MatchHeader match={match} centered={false} />
+        <MatchOptions match={match} selected={selected} onPick={onPick} stacked={false} />
+      </Card>
+    );
+  }
+
+  return (
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="poster-split">
+        <img className="poster-split__img" src={match.posterUrl} alt={match.name} loading="lazy" />
+        <div className="poster-split__body">
+          <MatchHeader match={match} centered />
+          <div className="poster-split__options">
+            <MatchOptions match={match} selected={selected} onPick={onPick} stacked />
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 interface Props {
   game: Game;
@@ -92,76 +198,9 @@ export function MakePicks({
       {/* MATCH PREDICTIONS */}
       <SectionLabel style={{ margin: '6px 0 14px' }}>Match predictions · 1 Pop each</SectionLabel>
       <div className="flex flex-col gap-3" style={{ marginBottom: 30 }}>
-        {game.matches.map((m) => {
-          const multi = m.options.length > 2;
-          return (
-            <Card key={m.id} style={{ padding: 0, overflow: 'hidden' }}>
-              {m.posterUrl && (
-                <img
-                  src={m.posterUrl}
-                  alt={m.name}
-                  loading="lazy"
-                  // 16:9 holds on narrow screens; the height cap stops the banner from
-                  // becoming ~750px tall on a full-width desktop card.
-                  style={{
-                    width: '100%',
-                    aspectRatio: '16 / 9',
-                    maxHeight: 260,
-                    objectFit: 'cover',
-                    display: 'block',
-                  }}
-                />
-              )}
-              <div style={{ padding: '16px 18px' }}>
-              <div className="flex items-center justify-between gap-2.5" style={{ marginBottom: 12 }}>
-                <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#6B7A99' }}>{m.name}</span>
-                {multi && (
-                  <span
-                    style={{
-                      fontSize: 9.5,
-                      fontWeight: 800,
-                      letterSpacing: '.08em',
-                      color: '#77E0E8',
-                      background: 'rgba(119,224,232,.12)',
-                      padding: '3px 8px',
-                      borderRadius: 999,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    PICK 1 OF {m.options.length}
-                  </span>
-                )}
-              </div>
-              {multi ? (
-                <div className="flex flex-col gap-2">
-                  {m.options.map((opt) => (
-                    <PickButton
-                      key={opt}
-                      align="left"
-                      selected={matchPicks[m.id] === opt}
-                      onClick={() => setMatch(m.id, opt)}
-                    >
-                      {opt}
-                    </PickButton>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 34px 1fr', gap: 10, alignItems: 'center' }}>
-                  <PickButton selected={matchPicks[m.id] === m.options[0]} onClick={() => setMatch(m.id, m.options[0])}>
-                    {m.options[0]}
-                  </PickButton>
-                  <span className="text-center" style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: '#6B7A99' }}>
-                    VS
-                  </span>
-                  <PickButton selected={matchPicks[m.id] === m.options[1]} onClick={() => setMatch(m.id, m.options[1])}>
-                    {m.options[1]}
-                  </PickButton>
-                </div>
-              )}
-              </div>
-            </Card>
-          );
-        })}
+        {game.matches.map((m) => (
+          <MatchCard key={m.id} match={m} selected={matchPicks[m.id]} onPick={(opt) => setMatch(m.id, opt)} />
+        ))}
       </div>
 
       {/* PROP BETS */}

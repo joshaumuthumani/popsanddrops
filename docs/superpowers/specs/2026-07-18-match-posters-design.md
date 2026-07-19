@@ -18,7 +18,7 @@ Posters can be supplied two ways — **file upload** or **pasted image URL** —
 | When can a poster be set? | **At game creation only.** There is no edit-game flow today and we are not building one. |
 | Upload or URL? | **Both**, converging on one field. |
 | Does a pasted URL get stored as-is? | **No.** It is fetched server-side and re-hosted, so we carry no dependency on anyone else's CDN. |
-| Layout | **Banner above** — full-bleed 16:9 image at the top of the match card. |
+| Layout | **Poster left, choices stacked right** on wide screens; collapses to poster-on-top when narrow. (Revised during implementation — see below.) |
 
 ### Why re-host rather than store the pasted link
 
@@ -102,16 +102,21 @@ The preview is functional, not decorative: it is where the admin sees the **actu
 
 ### 6. Make Picks render
 
-When `m.posterUrl` is set, the match `Card` renders a full-bleed image above the label row:
+> **Revised during implementation.** The original design put the poster in a full-bleed banner above the label. Built and driven in a browser, that turned out badly on desktop: the match card spans the full content width, so a strict 16:9 banner rendered ~750px tall. Capping the height fixed the height but cropped ~57% of the image — and real WWE key art carries the event logo and broadcast details at the top and bottom edges, which is exactly what got cut. The layout below solves both.
 
-- 16:9 box, `object-fit: cover`, centered.
-- `loading="lazy"` — a card can carry ten of these.
-- `alt` = the match name.
-- Card needs `overflow: hidden` so the image respects the 14px corner radius.
+When `m.posterUrl` is set, the card splits (class `.poster-split` in `index.css`):
 
-When `posterUrl` is absent the card renders **exactly as it does today**. Since posters are optional per match, a card list will routinely mix both.
+- **≥1100px** — poster column pinned at 620px, choices column takes the rest. Without the pin the poster keeps growing with the viewport (~540px tall at 1920px).
+- **640–1099px** — `3fr / 2fr`, poster leading.
+- **<640px** — single column: full-bleed 16:9 poster on top, choices beneath.
 
-WWE and AEW key art is generally landscape, so a centered cover crop is right in the common case; the builder preview is the safety valve for the rest.
+In the split, choices are centred in their column and capped at **270px** wide so the poster stays the dominant element. Two-competitor matches **stack vertically with the VS between them** rather than sitting side by side — there isn't width for the side-by-side row next to the art. Three-or-more-option matches already stacked, so they're unchanged.
+
+The image is `object-fit: cover` at 16:9, `loading="lazy"`, `alt` = match name, and the card needs `overflow: hidden` to respect its 14px radius.
+
+When `posterUrl` is absent the card renders **exactly as it does today**, including the side-by-side VS row. Posters are optional per match, so a list routinely mixes both.
+
+Measured: 620×349 poster and a 349px card at both 1280px and 1920px; 325×183 at 375px. A four-option match fits the same 349px, so the choices never outgrow the art in practice.
 
 ### 7. Demo mode
 

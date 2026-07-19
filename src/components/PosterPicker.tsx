@@ -73,11 +73,12 @@ export function PosterPicker({ value, onChange, uid }: Props) {
         <img
           src={value}
           alt="Match poster preview"
-          // Mirrors the picks-screen cap so the preview shows the crop players will see.
+          // Sized to roughly match the poster column on the picks screen, so the admin sees
+          // the same 16:9 framing players will get.
           style={{
             width: '100%',
+            maxWidth: 420,
             aspectRatio: '16 / 9',
-            maxHeight: 260,
             objectFit: 'cover',
             borderRadius: 9,
             border: '1px solid rgba(255,255,255,.1)',
