@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PosterError, ingestPosterUrl, uploadPosterFile } from '@/lib/posters';
 import { isFirebaseConfigured } from '@/lib/firebase';
 
@@ -8,6 +8,11 @@ interface Props {
   onChange: (posterUrl: string | undefined) => void;
   /** Uploading admin's uid — posters are stored under posters/{uid}/. */
   uid?: string;
+  /**
+   * Reports whether a link is typed-but-not-yet-hosted (or mid-fetch), so the builder can
+   * refuse to publish and silently drop it.
+   */
+  onPendingChange?: (pending: boolean) => void;
 }
 
 const ghostButton = {
@@ -40,11 +45,18 @@ const urlInput = {
  * The preview is doing real work: it shows the same 16:9 crop the picks screen will use,
  * which is the admin's chance to swap a poster that crops badly.
  */
-export function PosterPicker({ value, onChange, uid }: Props) {
+export function PosterPicker({ value, onChange, uid, onPendingChange }: Props) {
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState<'upload' | 'link' | null>(null);
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // A link sitting in the box is unsaved work — the builder needs to know so publishing
+  // can't quietly throw it away.
+  const pending = busy !== null || url.trim() !== '';
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [pending, onPendingChange]);
 
   // Both paths need Storage/Functions, neither of which exists in Phase-0 demo mode.
   const live = isFirebaseConfigured && Boolean(uid);
@@ -120,6 +132,15 @@ export function PosterPicker({ value, onChange, uid }: Props) {
           placeholder="…or paste an image link"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
+          // Fetch on blur and on Enter as well as via Add. Requiring the button meant a
+          // pasted link that looked accepted was silently dropped at publish.
+          onBlur={() => url.trim() && !busy && void run('link', () => ingestPosterUrl(url))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && url.trim() && !busy) {
+              e.preventDefault();
+              void run('link', () => ingestPosterUrl(url));
+            }
+          }}
           disabled={!live || busy !== null}
           style={{ ...urlInput, opacity: live ? 1 : 0.5 }}
         />

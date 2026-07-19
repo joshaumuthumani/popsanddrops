@@ -40,6 +40,7 @@ function QuestionBuilder({
   withPoster = false,
   uid,
   dayCount = 1,
+  onPosterPendingChange,
 }: {
   title: string;
   optionLabel: string;
@@ -50,6 +51,8 @@ function QuestionBuilder({
   uid?: string;
   /** Night selectors only appear once the event runs more than one night. */
   dayCount?: number;
+  /** Reports per-question whether a poster link is unsaved, keyed by question id. */
+  onPosterPendingChange?: (questionId: string, pending: boolean) => void;
 }) {
   const update = (idx: number, patch: Partial<DraftQuestion>) =>
     setQuestions(questions.map((q, i) => (i === idx ? { ...q, ...patch } : q)));
@@ -65,6 +68,7 @@ function QuestionBuilder({
                 value={q.posterUrl}
                 uid={uid}
                 onChange={(posterUrl) => update(idx, { posterUrl })}
+                onPendingChange={(pending) => onPosterPendingChange?.(q.id, pending)}
               />
             )}
             <div className="flex items-center gap-2 mb-3">
@@ -149,6 +153,8 @@ export function GameBuilder() {
   const [lockTime, setLockTime] = useState('');
   const [tiebreaker, setTiebreaker] = useState('');
   const [dayCount, setDayCount] = useState(1);
+  // Question ids whose poster link is typed but not yet hosted, or still fetching.
+  const [pendingPosters, setPendingPosters] = useState<Record<string, boolean>>({});
   const [matches, setMatches] = useState<DraftQuestion[]>([{ id: newId(), label: '', options: ['', ''] }]);
   const [props, setProps] = useState<DraftQuestion[]>([{ id: newId(), label: '', options: ['Yes', 'No'] }]);
   const [toastOpen, setToastOpen] = useState(false);
@@ -196,6 +202,17 @@ export function GameBuilder() {
     const lockMs = new Date(lockTime).getTime();
     if (Number.isNaN(lockMs)) {
       setError('That lock time looks invalid.');
+      return;
+    }
+    // A pasted link only becomes a poster once it's been fetched and re-hosted. Publishing
+    // with one still in the box used to discard it silently, so the game went live with no
+    // posters and no explanation.
+    const stillPending = Object.values(pendingPosters).filter(Boolean).length;
+    if (stillPending > 0) {
+      setError(
+        `${stillPending} poster ${stillPending === 1 ? 'link is' : 'links are'} still being added. ` +
+          'Wait for the preview to appear, or clear the link box, then publish.',
+      );
       return;
     }
 
@@ -291,7 +308,16 @@ export function GameBuilder() {
         )}
       </Card>
 
-      <QuestionBuilder title="Match predictions" optionLabel="Match" questions={matches} setQuestions={setMatches} withPoster uid={user?.uid} dayCount={dayCount} />
+      <QuestionBuilder
+        title="Match predictions"
+        optionLabel="Match"
+        questions={matches}
+        setQuestions={setMatches}
+        withPoster
+        uid={user?.uid}
+        dayCount={dayCount}
+        onPosterPendingChange={(id, pending) => setPendingPosters((p) => ({ ...p, [id]: pending }))}
+      />
       <QuestionBuilder title="Prop bets" optionLabel="Prop bet" questions={props} setQuestions={setProps} dayCount={dayCount} />
 
       <Card style={{ padding: 18, marginBottom: 22 }}>
