@@ -22,7 +22,7 @@ export { ingestPosterFromUrl } from './posters';
 export { sendNightStandings } from './standings';
 
 /** Reads a game's submissions + results, writes back per-submission scores and the leaderboard doc. */
-async function recomputeGame(gameId: string): Promise<void> {
+export async function recomputeGame(gameId: string): Promise<void> {
   const gameSnap = await db.doc(`games/${gameId}`).get();
   if (!gameSnap.exists) return;
   const game = gameSnap.data() as GameDoc;

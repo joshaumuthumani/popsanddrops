@@ -12,7 +12,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import type { GameDoc } from './scoring';
-import { sendStandingsEmail } from './index';
+import { recomputeGame, sendStandingsEmail } from './index';
 
 type NightGameDoc = GameDoc & {
   name?: string;
@@ -84,6 +84,12 @@ export const sendNightStandings = onCall<{ gameId?: string; night?: number }>(as
       `${ungraded.length} Night ${night} pick(s) still need a result before standings can go out.`,
     );
   }
+
+  // Rebuild the leaderboard first, exactly as onGameClose does before the final email.
+  // leaderboard/current is only written by onResultWrite, so anyone who submitted AFTER the
+  // last result was entered is missing from it — which made this function report "nobody has
+  // submitted" while the admin was looking at that player in the Players tab.
+  await recomputeGame(gameId);
 
   // Nobody has submitted picks yet, so there are no standings and nobody to mail. This must
   // be checked BEFORE claiming the night below: sendStandingsEmail no-ops on an empty
