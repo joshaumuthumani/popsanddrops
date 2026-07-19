@@ -48,6 +48,7 @@ function NightStandingsButton({
 
   const send = async () => {
     setError('');
+    setPartial('');
     setBusy(true);
     try {
       const { recipients, failed } = await sendNightStandings(game.id, night.day);

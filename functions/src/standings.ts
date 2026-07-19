@@ -58,8 +58,8 @@ export const sendNightStandings = onCall<{ gameId?: string; night?: number }>(as
     );
   }
 
-  // Already sent. Checked server-side, not just by a disabled button — the failure mode
-  // here is mailing the whole pod twice.
+  // Fast, friendly rejection for the common case. This is NOT the authoritative check — two
+  // racing calls can both pass it. The binding one is the transaction below.
   if ((game.standingsSentFor ?? []).includes(night)) {
     throw new HttpsError('already-exists', `Night ${night} standings have already been sent.`);
   }
@@ -104,10 +104,19 @@ export const sendNightStandings = onCall<{ gameId?: string; night?: number }>(as
     );
   }
 
-  // Claim the night BEFORE sending, so a double-click or concurrent admin can't mail everyone
-  // twice. If the send PARTIALLY fails we keep the claim and stand by that trade — under-send
-  // beats double-send, and the failures land in emailLog.
-  await gameSnap.ref.update({ standingsSentFor: FieldValue.arrayUnion(night) });
+  // Claim the night BEFORE sending, so a double-click or a second admin can't mail everyone
+  // twice. The read and the write must be atomic: checking the snapshot fetched at the top of
+  // this function and then writing would let two racing calls both pass the check and both
+  // send. Whoever loses the transaction gets 'already-exists' and never reaches the send —
+  // which is also what makes the rollback below safe, since only the winner can roll back.
+  await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(gameSnap.ref);
+    const sentFor = (fresh.data()?.standingsSentFor as number[] | undefined) ?? [];
+    if (sentFor.includes(night)) {
+      throw new HttpsError('already-exists', `Night ${night} standings have already been sent.`);
+    }
+    tx.update(gameSnap.ref, { standingsSentFor: FieldValue.arrayUnion(night) });
+  });
 
   const outcome = await sendStandingsEmail(gameId, game, 'interim', night);
 
@@ -116,9 +125,31 @@ export const sendNightStandings = onCall<{ gameId?: string; night?: number }>(as
   // of them while this function still returned success — with the night permanently burned and
   // the button disabled forever. Release the claim so the admin can genuinely retry, and fail
   // loudly rather than reporting a send that never happened.
+  //
+  // A PARTIAL failure keeps the claim: retrying would mail the successful recipients twice, so
+  // we under-send deliberately and report the count back instead. Failures land in emailLog.
   if (outcome.delivered === 0) {
-    await gameSnap.ref.update({ standingsSentFor: FieldValue.arrayRemove(night) });
-    logger.error(`Night ${night} standings for game ${gameId} reached nobody; claim released.`, outcome);
+    // The release can itself fail. If it does, the night stays claimed and the admin is in
+    // exactly the stuck state this whole change exists to prevent — so say so explicitly
+    // rather than letting a raw Firestore error surface as if the send were the problem.
+    let released = true;
+    try {
+      await gameSnap.ref.update({ standingsSentFor: FieldValue.arrayRemove(night) });
+    } catch (err) {
+      released = false;
+      logger.error(`Could not release the Night ${night} claim on game ${gameId}.`, err);
+    }
+    logger.error(
+      `Night ${night} standings for game ${gameId} reached nobody (claim ${released ? 'released' : 'STUCK'}).`,
+      outcome,
+    );
+    if (!released) {
+      throw new HttpsError(
+        'internal',
+        `Couldn't send the Night ${night} standings, and couldn't undo the attempt. ` +
+          'The button will stay disabled for this night until it\'s cleared manually — tell your organizer.',
+      );
+    }
     throw new HttpsError(
       'internal',
       outcome.configured

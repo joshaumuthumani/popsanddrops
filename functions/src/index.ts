@@ -69,7 +69,24 @@ export const onGameClose = onDocumentUpdated('games/{gameId}', async (event) => 
 
   const gameId = event.params.gameId;
   await recomputeGame(gameId); // status is now CLOSED, so the tiebreaker is applied
-  await sendStandingsEmail(gameId, after as GameDoc & { name?: string; eventDate?: string }, 'final');
+  const outcome = await sendStandingsEmail(
+    gameId,
+    after as GameDoc & { name?: string; eventDate?: string },
+    'final',
+  );
+
+  // Record what actually happened on the game doc. This is the highest-stakes send in the app
+  // and the one with no retry button — closing is one-way — so a failure that only ever
+  // reached a Cloud Functions log line would be invisible to the person who needs to know.
+  // Writing back here re-triggers this function, but the `before.status === 'CLOSED'` guard
+  // above returns immediately on that second pass.
+  if (outcome.delivered === 0) {
+    logger.error(`Final results email for game ${gameId} reached nobody.`, outcome);
+  }
+  await db.doc(`games/${gameId}`).set(
+    { resultsEmail: { ...outcome, at: Date.now() } },
+    { merge: true },
+  );
 });
 
 /**
