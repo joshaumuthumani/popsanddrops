@@ -30,12 +30,18 @@ import {
  * A green typecheck told us nothing about any of them.
  */
 
-const PROJECT_ID = 'popsanddrops-rules-test';
+// The `demo-` prefix is Firebase's documented convention for a project the emulators will
+// never attempt auth or billing calls for. Belt and braces on top of the --project override
+// in the npm script: nothing here should be able to reach the real popsanddrops project.
+const PROJECT_ID = 'demo-popsanddrops-rules';
 
 let testEnv: RulesTestEnvironment;
 
-const LOCK_TIME = Date.parse('2030-01-01T00:00:00Z');
-const PAST_LOCK = Date.parse('2020-01-01T00:00:00Z');
+// Relative to now, not hardcoded dates. A literal future timestamp is a test that silently
+// starts failing on a particular morning years from now, for reasons nobody will connect to
+// this file.
+const LOCK_TIME = Date.now() + 365 * 24 * 60 * 60 * 1000;
+const PAST_LOCK = Date.now() - 365 * 24 * 60 * 60 * 1000;
 
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
@@ -139,6 +145,11 @@ describe('collection-group query on submissions', () => {
     expect(snap.size).toBe(2);
   });
 
+  // The three negative tests below pin the `resource.data.uid == uid()` SCOPING clause, not
+  // the existence of the recursive wildcard itself. Worth being precise about: if the whole
+  // rule were deleted, every collection-group query would be denied and these three would
+  // still pass — for the wrong reason. The two positive tests above are what actually catch
+  // that, and they are the ones verified by mutation.
   it("refuses a query for someone else's submissions", async () => {
     const db = asPlayer1();
     const q = query(collectionGroup(db, 'submissions'), where('uid', '==', 'player2'));

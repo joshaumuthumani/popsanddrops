@@ -6,10 +6,14 @@ import react from '@vitejs/plugin-react';
  * Unit + component tests. Deliberately separate from vite.config.ts: the Tailwind plugin
  * isn't needed to run tests and pulling it in slows every run for no benefit.
  *
- * `functions/` is included in the project list because the scoring mirror test imports BOTH
- * src/lib/scoring.ts and functions/src/scoring.ts and runs them against identical fixtures.
- * That test is what turns the "these two files are mirrors" rule in CLAUDE.md from a comment
- * someone has to remember into something the build enforces.
+ * Nothing special is configured for `functions/` — tests/scoring-mirror.test.ts is picked up
+ * by the `tests/` glob below and simply imports functions/src/scoring.ts directly, running it
+ * against the same fixtures as the client implementation. That test is what makes a
+ * divergence between the two mirrored scoring files fail the build.
+ *
+ * Note what it does and doesn't prove: it asserts the two implementations AGREE, not that
+ * either is correct. Break both the same way and it stays green. Correctness is pinned by the
+ * hardcoded expectations in src/lib/scoring.test.ts.
  */
 export default defineConfig({
   plugins: [react()],
@@ -21,7 +25,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'tests/**/*.test.{ts,tsx}'],
-    // Emulator-backed E2E lives in tests/e2e and runs under Playwright, not here.
+    // Emulator-backed tests live in tests/e2e. They're vitest too, but need the Firebase
+    // emulators running, so they're excluded here and driven by `npm run test:e2e`.
     exclude: ['**/node_modules/**', 'tests/e2e/**'],
   },
 });
