@@ -9,12 +9,12 @@ on:
   pull_request:
 
 concurrency:
-  # Supersede in-flight runs for the same branch, but never for the default branch — its
-  # history should keep a complete record of what passed. Compared against the repository's
-  # actual default branch rather than a hardcoded "main": this repo's default is not named
-  # main, so a literal made the guard dead code that never once fired.
+  # Supersede in-flight runs for the same ref. Deliberately unconditional: an earlier version
+  # tried to exempt the default branch via an expression over github.event.repository, which
+  # made the whole workflow fail to start (startup_failure, before any job ran). A cancelled
+  # run still appears in the Actions log, so nothing is actually lost by superseding.
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
+  cancel-in-progress: true
 
 jobs:
   verify:
