@@ -32,6 +32,8 @@ export function UserGame() {
   if (loading) return <p className="text-muted">Loading…</p>;
   if (!game) return <p className="text-muted">That game doesn't exist or the code was wrong.</p>;
 
+  // Deliberately does NOT swallow errors: MakePicks awaits this and only confirms on
+  // success, so a rejection here is what surfaces the failure to the player.
   const handleSubmit = async (picks: SubmissionInput) => {
     if (!isFirebaseConfigured || !user) return;
     setSaving(true);

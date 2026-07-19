@@ -120,11 +120,12 @@ interface Props {
   /** When true, the show has locked — picks are read-only (PRD §4.4). */
   locked?: boolean;
   saving?: boolean;
+  /** Must reject on failure — the confirmation toast waits on this promise. */
   onSubmit?: (picks: {
     matchPicks: Record<string, string>;
     propBetPicks: Record<string, string>;
     tiebreakerAnswer: string;
-  }) => void;
+  }) => void | Promise<void>;
 }
 
 /** USER · MAKE PICKS — two sections + tiebreaker, live countdown, "Lock In Your Picks". */
@@ -141,6 +142,7 @@ export function MakePicks({
   const [propPicks, setPropPicks] = useState<Record<string, string>>(initialPropPicks);
   const [tiebreaker, setTiebreaker] = useState(initialTiebreaker);
   const [toastOpen, setToastOpen] = useState(false);
+  const [error, setError] = useState('');
 
   const editable = !locked;
   const setMatch = (id: string, opt: string) => editable && setMatchPicks((p) => ({ ...p, [id]: opt }));
@@ -151,10 +153,25 @@ export function MakePicks({
   const pct = Math.round((made / total) * 100);
   const allAnswered = made === total && tiebreaker.trim() !== '';
 
-  const submit = () => {
+  /**
+   * Only confirm once the save has actually resolved. This used to fire the toast
+   * synchronously alongside an un-awaited promise, so a rejected write — rules denial,
+   * network drop — looked exactly like success and the player walked away believing
+   * their picks were in when nothing had been stored.
+   */
+  const submit = async () => {
     if (!allAnswered || saving || !onSubmit) return;
-    onSubmit({ matchPicks, propBetPicks: propPicks, tiebreakerAnswer: tiebreaker });
-    setToastOpen(true);
+    setError('');
+    try {
+      await onSubmit({ matchPicks, propBetPicks: propPicks, tiebreakerAnswer: tiebreaker });
+      setToastOpen(true);
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message
+          ? `Couldn't lock in your picks — ${err.message}`
+          : "Couldn't lock in your picks. Check your connection and try again.",
+      );
+    }
   };
 
   const lockLabel = useMemo(() => new Date(game.lockTime).toLocaleString(), [game.lockTime]);
@@ -294,9 +311,15 @@ export function MakePicks({
           <GoldButton full onClick={submit} style={{ opacity: allAnswered && !saving ? 1 : 0.6 }}>
             {saving ? 'Locking in…' : 'Lock In Your Picks'}
           </GoldButton>
-          <p className="text-center text-muted" style={{ fontSize: 12.5, marginTop: 12 }}>
-            {allAnswered ? 'You can edit your picks until the countdown ends.' : `Answer all ${total} picks + the tiebreaker to lock in.`}
-          </p>
+          {error ? (
+            <p className="text-center" style={{ color: '#C0392B', fontSize: 13, marginTop: 12 }}>
+              {error}
+            </p>
+          ) : (
+            <p className="text-center text-muted" style={{ fontSize: 12.5, marginTop: 12 }}>
+              {allAnswered ? 'You can edit your picks until the countdown ends.' : `Answer all ${total} picks + the tiebreaker to lock in.`}
+            </p>
+          )}
         </>
       )}
 
