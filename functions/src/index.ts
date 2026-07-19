@@ -75,18 +75,17 @@ export const onGameClose = onDocumentUpdated('games/{gameId}', async (event) => 
     'final',
   );
 
-  // Record what actually happened on the game doc. This is the highest-stakes send in the app
-  // and the one with no retry button — closing is one-way — so a failure that only ever
-  // reached a Cloud Functions log line would be invisible to the person who needs to know.
-  // Writing back here re-triggers this function, but the `before.status === 'CLOSED'` guard
-  // above returns immediately on that second pass.
+  // Record what actually happened. This is the highest-stakes send in the app and the one with
+  // no retry button — closing is one-way — so a failure that only ever reached a Cloud
+  // Functions log line would be invisible to the person who needs to know.
+  //
+  // Written to a subcollection, NOT merged into games/{id}: closed games are frozen, and
+  // recomputeGame already sets the precedent that post-close bookkeeping lives beside the game
+  // rather than in it. This also avoids re-triggering onGameClose on the game document.
   if (outcome.delivered === 0) {
     logger.error(`Final results email for game ${gameId} reached nobody.`, outcome);
   }
-  await db.doc(`games/${gameId}`).set(
-    { resultsEmail: { ...outcome, at: Date.now() } },
-    { merge: true },
-  );
+  await db.doc(`games/${gameId}/meta/resultsEmail`).set({ ...outcome, at: Date.now() });
 });
 
 /**

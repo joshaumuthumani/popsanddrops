@@ -163,5 +163,14 @@ export const sendNightStandings = onCall<{ gameId?: string; night?: number }>(as
       `${outcome.delivered} delivered, ${outcome.failed} failed, ${outcome.noAddress} without an address.`,
   );
 
-  return { sent: true, night, recipients: outcome.delivered, failed: outcome.failed };
+  // noAddress travels with the rest. A player with no email on their user doc gets nothing,
+  // and dropping that count here would have left the admin reading a clean "standings sent"
+  // while part of the pod heard nothing — the exact failure this whole change is about.
+  return {
+    sent: true,
+    night,
+    recipients: outcome.delivered,
+    failed: outcome.failed,
+    noAddress: outcome.noAddress,
+  };
 });

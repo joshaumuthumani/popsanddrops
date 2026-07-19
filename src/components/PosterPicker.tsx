@@ -58,10 +58,17 @@ export function PosterPicker({ value, onChange, uid, onPendingChange }: Props) {
     onPendingChange?.(pending);
   }, [pending, onPendingChange]);
 
-  // Retract the flag when this picker goes away — the row it belonged to was removed, so the
-  // admin has no way to act on it. Without this the builder keeps counting a pending link for
-  // a question that no longer exists and refuses to publish. Unmount only: a cleanup tied to
-  // `pending` would fight the effect above on every keystroke.
+  // Retract the flag when this picker goes away, so no stale "pending" entry outlives the row.
+  //
+  // Defence in depth, not the primary fix: QuestionBuilder.remove() clears the flag directly,
+  // and publish counts only questions still present, so either of those alone would prevent a
+  // removed row from blocking publish. This covers any future unmount path that forgets to.
+  //
+  // Unmount only. Keying this to `pending` would retract the flag whenever that boolean flips
+  // (empty↔non-empty, or a busy transition) and immediately re-set it — churn for no gain.
+  // Safe despite the frozen closure because `onPendingChange` only ever closes over a stable
+  // q.id feeding a stable state setter; if that ever changes, this needs revisiting, and
+  // nothing will warn you.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => () => onPendingChange?.(false), []);
 
