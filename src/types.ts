@@ -53,6 +53,11 @@ export interface Game {
   lockTime: number;
   /** How many nights the event runs. 1 for a normal single-night card. */
   dayCount: number;
+  /**
+   * Nights whose interim standings email has already gone out. Written server-side by the
+   * sendNightStandings callable so a retry can't mail the whole pod twice.
+   */
+  standingsSentFor?: number[];
   status: GameStatus;
   matches: Match[];
   propBets: PropBet[];

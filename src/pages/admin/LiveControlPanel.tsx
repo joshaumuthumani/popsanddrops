@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Game } from '@/types';
 import { Card, LiveBanner, NightHeading } from '@/components/primitives';
@@ -7,13 +7,96 @@ import { PickButton } from '@/components/PickButton';
 import { CheckIcon } from '@/components/icons';
 import { useAuth } from '@/context/AuthContext';
 import { useResults } from '@/hooks/data';
-import { setResult } from '@/lib/store';
+import { sendNightStandings, setResult } from '@/lib/store';
 import { isFirebaseConfigured } from '@/lib/firebase';
+import { nightCount } from '@/lib/nights';
 
 interface Props {
   game: Game;
   /** Closed games are final — results display read-only and can't be changed (PRD §4.6). */
   readOnly?: boolean;
+}
+
+/**
+ * "Send Night N standings" — only for non-final nights of a multi-night card. The final
+ * night's report is the results email that goes out when the game is closed.
+ *
+ * The disabled states here are a convenience. Every rule that matters (admin role, night
+ * fully graded, not already sent) is enforced again in the callable, because the failure
+ * mode is emailing the whole pod twice.
+ */
+function NightStandingsButton({
+  game,
+  night,
+}: {
+  game: Game;
+  night: { day: number; questions: { id: string }[] };
+}) {
+  const results = useResults(game.id);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [sent, setSent] = useState(false);
+
+  const isFinalNight = night.day >= nightCount(game);
+  if (isFinalNight) return null; // covered by the close-game results email
+
+  const alreadySent = sent || (game.standingsSentFor ?? []).includes(night.day);
+  const ungraded = night.questions.filter((q) => !results[q.id]).length;
+  const live = isFirebaseConfigured;
+  const canSend = live && !alreadySent && ungraded === 0 && !busy;
+
+  const send = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      await sendNightStandings(game.id, night.day);
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send standings.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const label = alreadySent
+    ? `Night ${night.day} standings sent`
+    : busy
+      ? 'Sending…'
+      : `Send Night ${night.day} standings`;
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <button
+        onClick={send}
+        disabled={!canSend}
+        className="cursor-pointer font-extrabold"
+        style={{
+          fontFamily: 'inherit',
+          fontSize: 13.5,
+          padding: '11px 18px',
+          borderRadius: 10,
+          border: `1.5px solid ${canSend ? 'rgba(119,224,232,.45)' : 'rgba(255,255,255,.12)'}`,
+          background: canSend ? 'rgba(119,224,232,.12)' : 'transparent',
+          color: canSend ? '#77E0E8' : '#6B7A99',
+          cursor: canSend ? 'pointer' : 'default',
+        }}
+      >
+        {label}
+      </button>
+      {!alreadySent && ungraded > 0 && (
+        <p style={{ color: '#6B7A99', fontSize: 12, marginTop: 6 }}>
+          {ungraded} more {ungraded === 1 ? 'result' : 'results'} to call before Night {night.day}{' '}
+          standings can go out.
+        </p>
+      )}
+      {!live && (
+        <p style={{ color: '#6B7A99', fontSize: 12, marginTop: 6 }}>
+          Sending standings needs a live Firebase connection — unavailable in demo mode.
+        </p>
+      )}
+      {error && <p style={{ color: '#C0392B', fontSize: 12, marginTop: 6 }}>{error}</p>}
+    </div>
+  );
 }
 
 /** ADMIN · LIVE CONTROL — mark each winner (matches + props); the board updates live. */
@@ -69,6 +152,7 @@ export function LiveControlPanel({ game, readOnly = false }: Props) {
           {night.label && <NightHeading label={night.label} />}
           <div className="flex flex-col gap-3">
             {night.questions.map((q) => (
+
               <Card key={q.id} style={{ padding: '16px 18px' }}>
                 <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#6B7A99', marginBottom: 12 }}>{q.name}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: q.options.length > 2 ? '1fr 1fr' : '1fr 1fr', gap: 10 }}>
@@ -81,6 +165,7 @@ export function LiveControlPanel({ game, readOnly = false }: Props) {
               </Card>
             ))}
           </div>
+          {!readOnly && <NightStandingsButton game={game} night={night} />}
         </div>
       ))}
 

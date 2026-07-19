@@ -16,7 +16,8 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '@/lib/firebase';
 import type { Game, GameStatus, LeaderboardEntry, Results, Role, Submission, UserProfile } from '@/types';
 import { buildLeaderboard, type RankableSubmission } from '@/lib/scoring';
 
@@ -38,6 +39,7 @@ function normalizeGame(id: string, data: Record<string, unknown>): Game {
     lockTime: Number(data.lockTime ?? 0),
     // Games created before multi-night support have no dayCount — they're single-night.
     dayCount: Math.max(1, Number(data.dayCount ?? 1) || 1),
+    standingsSentFor: (data.standingsSentFor as number[]) ?? [],
     status: (data.status as GameStatus) ?? 'OPEN',
     matches: (data.matches as Game['matches']) ?? [],
     propBets: (data.propBets as Game['propBets']) ?? [],
@@ -244,6 +246,22 @@ export async function closeGame(gameId: string, tiebreakerAnswer: string): Promi
 }
 
 // ---------- users (admin management) ----------
+
+/**
+ * Asks the server to email the pod interim standings for one night of a multi-night card.
+ *
+ * All the gating — admin role, "is that night fully graded", "has it already gone out" —
+ * lives in the callable, not here. The button's disabled state is a convenience; the
+ * server is what actually prevents mailing everyone twice.
+ */
+export async function sendNightStandings(gameId: string, night: number): Promise<void> {
+  if (!functions) throw new Error('Sending standings needs a live Firebase connection.');
+  const callable = httpsCallable<{ gameId: string; night: number }, { sent: boolean }>(
+    functions,
+    'sendNightStandings',
+  );
+  await callable({ gameId, night });
+}
 
 export function subscribeUsers(cb: (users: UserProfile[]) => void): Unsub {
   return onSnapshot(collection(reqDb(), 'users'), (snap) =>

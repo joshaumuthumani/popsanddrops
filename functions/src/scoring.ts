@@ -3,8 +3,10 @@
 // submission and to the denormalized leaderboard doc by the Cloud Functions.
 
 export interface GameDoc {
-  matches: { id: string; name: string; options: string[] }[];
-  propBets: { id: string; question: string; options: string[] }[];
+  // `day` mirrors Match/PropBet on the client. Type-only: nights are a presentational
+  // grouping and never affect scoring, which grades every question regardless of night.
+  matches: { id: string; name: string; options: string[]; day?: number }[];
+  propBets: { id: string; question: string; options: string[]; day?: number }[];
   tiebreakerQuestion: string;
   tiebreakerAnswer?: string;
   status: string;
