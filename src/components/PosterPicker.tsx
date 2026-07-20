@@ -58,6 +58,20 @@ export function PosterPicker({ value, onChange, uid, onPendingChange }: Props) {
     onPendingChange?.(pending);
   }, [pending, onPendingChange]);
 
+  // Retract the flag when this picker goes away, so no stale "pending" entry outlives the row.
+  //
+  // Defence in depth, not the primary fix: QuestionBuilder.remove() clears the flag directly,
+  // and publish counts only questions still present, so either of those alone would prevent a
+  // removed row from blocking publish. This covers any future unmount path that forgets to.
+  //
+  // Unmount only. Keying this to `pending` would retract the flag whenever that boolean flips
+  // (empty↔non-empty, or a busy transition) and immediately re-set it — churn for no gain.
+  // Safe despite the frozen closure because `onPendingChange` only ever closes over a stable
+  // q.id feeding a stable state setter; if that ever changes, this needs revisiting, and
+  // nothing will warn you.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => onPendingChange?.(false), []);
+
   // Both paths need Storage/Functions, neither of which exists in Phase-0 demo mode.
   const live = isFirebaseConfigured && Boolean(uid);
 

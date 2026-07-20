@@ -1,0 +1,79 @@
+name: CI
+
+# Runs on every push to any branch and every pull request. There is no path filter and no
+# skip condition by design: a change that "obviously can't break anything" is exactly the
+# kind that has broken this app before.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  # Supersede in-flight runs for the same ref. Deliberately unconditional: an earlier version
+  # tried to exempt the default branch via an expression over github.event.repository, which
+  # made the whole workflow fail to start (startup_failure, before any job ran). A cancelled
+  # run still appears in the Actions log, so nothing is actually lost by superseding.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, lint, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Install functions dependencies
+        run: npm ci --prefix functions
+
+      # Typechecks the app AND the tests — tsconfig.app.json includes both, so a broken test
+      # fails the build rather than being quietly skipped.
+      - name: Typecheck app and tests
+        run: npx tsc -b
+
+      - name: Typecheck Cloud Functions
+        run: npx tsc --noEmit -p functions/tsconfig.json
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit and component tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  e2e:
+    name: Firestore rules (emulator)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          # The Firestore and Storage emulators are JVM processes. firebase-tools requires
+          # JDK 21 or above and fails outright below that.
+          distribution: temurin
+          java-version: 21
+
+      - name: Install app dependencies
+        run: npm ci
+
+      # Runs the security rules against the real emulator — the only way to test the
+      # collection-group authorization, the server-clock pick lock, and the closed-game
+      # freeze. Unit tests and demo mode cannot reach any of these.
+      - name: Run rules tests against emulators
+        run: npm run test:e2e

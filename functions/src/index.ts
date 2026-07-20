@@ -69,7 +69,23 @@ export const onGameClose = onDocumentUpdated('games/{gameId}', async (event) => 
 
   const gameId = event.params.gameId;
   await recomputeGame(gameId); // status is now CLOSED, so the tiebreaker is applied
-  await sendStandingsEmail(gameId, after as GameDoc & { name?: string; eventDate?: string }, 'final');
+  const outcome = await sendStandingsEmail(
+    gameId,
+    after as GameDoc & { name?: string; eventDate?: string },
+    'final',
+  );
+
+  // Record what actually happened. This is the highest-stakes send in the app and the one with
+  // no retry button — closing is one-way — so a failure that only ever reached a Cloud
+  // Functions log line would be invisible to the person who needs to know.
+  //
+  // Written to a subcollection, NOT merged into games/{id}: closed games are frozen, and
+  // recomputeGame already sets the precedent that post-close bookkeeping lives beside the game
+  // rather than in it. This also avoids re-triggering onGameClose on the game document.
+  if (outcome.delivered === 0) {
+    logger.error(`Final results email for game ${gameId} reached nobody.`, outcome);
+  }
+  await db.doc(`games/${gameId}/meta/resultsEmail`).set({ ...outcome, at: Date.now() });
 });
 
 /**
@@ -81,13 +97,28 @@ export const onGameClose = onDocumentUpdated('games/{gameId}', async (event) => 
  *
  * Standings are READ from the leaderboard doc, never recomputed here: onResultWrite already
  * keeps games/{id}/leaderboard/current up to date on every result entry.
+ *
+ * Returns what actually happened rather than resolving unconditionally. Callers that record
+ * a send as done — sendNightStandings claims the night in `standingsSentFor` — must not treat
+ * "the promise resolved" as "mail went out"; every recipient can fail independently.
  */
+export interface SendOutcome {
+  /** Recipients Resend accepted. Zero here means nobody heard anything. */
+  delivered: number;
+  /** Recipients whose send threw; each also has a games/{id}/emailLog/{uid} entry. */
+  failed: number;
+  /** Participants with no email on their user doc — nothing was attempted for them. */
+  noAddress: number;
+  /** False when RESEND_API_KEY is unset, i.e. Phase 2 isn't configured in this environment. */
+  configured: boolean;
+}
+
 export async function sendStandingsEmail(
   gameId: string,
   game: GameDoc & { name?: string; eventDate?: string },
   variant: 'final' | 'interim',
   night?: number,
-): Promise<void> {
+): Promise<SendOutcome> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM ?? 'Pops & Drops <noreply@popsanddrops.us>';
   const appUrl = process.env.APP_PUBLIC_URL ?? 'https://popsanddrops.web.app';
@@ -96,11 +127,11 @@ export async function sendStandingsEmail(
   const entries = (boardSnap.data()?.entries as { uid: string; displayName: string; popCount: number; rank: number }[]) ?? [];
   if (entries.length === 0) {
     logger.info(`No participants to email for game ${gameId}.`);
-    return;
+    return { delivered: 0, failed: 0, noAddress: 0, configured: true };
   }
   if (!apiKey) {
     logger.warn(`RESEND_API_KEY not set — skipping results email for game ${gameId} (Phase 2 not configured).`);
-    return;
+    return { delivered: 0, failed: 0, noAddress: 0, configured: false };
   }
 
   const top3 = entries.filter((e) => e.rank <= 3).slice(0, 3);
@@ -139,13 +170,15 @@ export async function sendStandingsEmail(
       </p>
     </div>`;
 
-  // Look up each participant's email and send. Failures are logged for admin visibility (PRD §4.7).
-  await Promise.all(
-    entries.map(async (e) => {
+  // Look up each participant's email and send. Failures are logged for admin visibility (PRD §4.7)
+  // AND counted — the caller needs to know whether anything actually landed. Swallowing these
+  // silently let a totally failed send (bad key, unverified domain, Resend outage) report success.
+  const outcomes = await Promise.all(
+    entries.map(async (e): Promise<'delivered' | 'failed' | 'noAddress'> => {
       try {
         const userSnap = await db.doc(`users/${e.uid}`).get();
         const email = userSnap.data()?.email as string | undefined;
-        if (!email) return;
+        if (!email) return 'noAddress';
         const res = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -160,16 +193,29 @@ export async function sendStandingsEmail(
           const body = await res.text();
           throw new Error(`Resend ${res.status}: ${body}`);
         }
+        return 'delivered';
       } catch (err) {
         logger.error(`Failed to email ${e.uid} for game ${gameId}`, err);
         await db.doc(`games/${gameId}/emailLog/${e.uid}`).set({
           error: String(err),
           failedAt: Date.now(),
         });
+        return 'failed';
       }
     }),
   );
-  logger.info(`${variant} standings emails dispatched for game ${gameId}.`);
+
+  const outcome: SendOutcome = {
+    delivered: outcomes.filter((o) => o === 'delivered').length,
+    failed: outcomes.filter((o) => o === 'failed').length,
+    noAddress: outcomes.filter((o) => o === 'noAddress').length,
+    configured: true,
+  };
+  logger.info(
+    `${variant} standings emails for game ${gameId}: ` +
+      `${outcome.delivered} delivered, ${outcome.failed} failed, ${outcome.noAddress} without an address.`,
+  );
+  return outcome;
 }
 
 export function escapeHtml(s: string): string {

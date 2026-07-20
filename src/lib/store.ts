@@ -254,13 +254,26 @@ export async function closeGame(gameId: string, tiebreakerAnswer: string): Promi
  * lives in the callable, not here. The button's disabled state is a convenience; the
  * server is what actually prevents mailing everyone twice.
  */
-export async function sendNightStandings(gameId: string, night: number): Promise<void> {
+/**
+ * Returns per-recipient counts, not just a boolean. The callable throws when the send reaches
+ * nobody, but a partial failure resolves — and the admin needs to be told, otherwise "standings
+ * sent" is a lie for whoever didn't get one.
+ */
+export async function sendNightStandings(
+  gameId: string,
+  night: number,
+): Promise<{ recipients: number; failed: number; noAddress: number }> {
   if (!functions) throw new Error('Sending standings needs a live Firebase connection.');
-  const callable = httpsCallable<{ gameId: string; night: number }, { sent: boolean }>(
-    functions,
-    'sendNightStandings',
-  );
-  await callable({ gameId, night });
+  const callable = httpsCallable<
+    { gameId: string; night: number },
+    { sent: boolean; recipients?: number; failed?: number; noAddress?: number }
+  >(functions, 'sendNightStandings');
+  const { data } = await callable({ gameId, night });
+  return {
+    recipients: data.recipients ?? 0,
+    failed: data.failed ?? 0,
+    noAddress: data.noAddress ?? 0,
+  };
 }
 
 export function subscribeUsers(cb: (users: UserProfile[]) => void): Unsub {

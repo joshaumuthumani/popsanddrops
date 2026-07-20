@@ -22,7 +22,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+
+    // Tests are typechecked alongside the app rather than in a separate pass, so a broken
+    // test is a build failure. That needs vitest's globals and jest-dom's matchers declared.
+    "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src"]
+  "include": ["src", "tests"]
 }

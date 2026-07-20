@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, PageTitle, SectionLabel, GoldButton } from '@/components/primitives';
 import { PosterPicker } from '@/components/PosterPicker';
@@ -45,7 +45,7 @@ function QuestionBuilder({
   title: string;
   optionLabel: string;
   questions: DraftQuestion[];
-  setQuestions: (q: DraftQuestion[]) => void;
+  setQuestions: Dispatch<SetStateAction<DraftQuestion[]>>;
   /** Matches get a poster control; prop bets don't (PRD scope). */
   withPoster?: boolean;
   uid?: string;
@@ -54,20 +54,39 @@ function QuestionBuilder({
   /** Reports per-question whether a poster link is unsaved, keyed by question id. */
   onPosterPendingChange?: (questionId: string, pending: boolean) => void;
 }) {
-  const update = (idx: number, patch: Partial<DraftQuestion>) =>
-    setQuestions(questions.map((q, i) => (i === idx ? { ...q, ...patch } : q)));
+  /**
+   * Keyed by question id, not array index, and updates functionally rather than closing over
+   * `questions`. Both matter: a poster ingest started on blur can resolve AFTER its row was
+   * removed, and the old index-based version wrote back the pre-removal array — resurrecting
+   * the deleted question, or landing the poster on whichever match had inherited that index.
+   * An id that no longer exists now patches nothing, which is the correct outcome.
+   */
+  const update = (
+    id: string,
+    patch: Partial<DraftQuestion> | ((q: DraftQuestion) => Partial<DraftQuestion>),
+  ) =>
+    setQuestions((qs) =>
+      qs.map((q) => (q.id === id ? { ...q, ...(typeof patch === 'function' ? patch(q) : patch) } : q)),
+    );
+
+  const remove = (id: string) => {
+    // Drop any "poster link still pending" flag with the row. Left behind, it blocks publish
+    // forever, pointing the admin at a link box that no longer exists on the page.
+    onPosterPendingChange?.(id, false);
+    setQuestions((qs) => qs.filter((q) => q.id !== id));
+  };
 
   return (
     <div style={{ marginBottom: 26 }}>
       <SectionLabel style={{ marginBottom: 14 }}>{title}</SectionLabel>
       <div className="flex flex-col gap-3">
-        {questions.map((q, idx) => (
+        {questions.map((q) => (
           <Card key={q.id} style={{ padding: 16 }}>
             {withPoster && (
               <PosterPicker
                 value={q.posterUrl}
                 uid={uid}
-                onChange={(posterUrl) => update(idx, { posterUrl })}
+                onChange={(posterUrl) => update(q.id, { posterUrl })}
                 onPendingChange={(pending) => onPosterPendingChange?.(q.id, pending)}
               />
             )}
@@ -75,13 +94,13 @@ function QuestionBuilder({
               <input
                 placeholder={`${optionLabel} name`}
                 value={q.label}
-                onChange={(e) => update(idx, { label: e.target.value })}
+                onChange={(e) => update(q.id, { label: e.target.value })}
                 style={inputStyle}
               />
               {dayCount > 1 && (
                 <select
                   value={q.day ?? 1}
-                  onChange={(e) => update(idx, { day: Number(e.target.value) })}
+                  onChange={(e) => update(q.id, { day: Number(e.target.value) })}
                   style={{ ...inputStyle, width: 'auto', flex: 'none', cursor: 'pointer' }}
                   title="Which night this runs on"
                 >
@@ -93,7 +112,7 @@ function QuestionBuilder({
                 </select>
               )}
               <button
-                onClick={() => setQuestions(questions.filter((_, i) => i !== idx))}
+                onClick={() => remove(q.id)}
                 className="cursor-pointer bg-transparent"
                 style={{ border: '1.5px solid rgba(255,255,255,.12)', color: '#6B7A99', borderRadius: 9, padding: '8px 12px', fontWeight: 800 }}
                 title="Remove"
@@ -107,12 +126,12 @@ function QuestionBuilder({
                   <input
                     placeholder={`Option ${oi + 1}`}
                     value={opt}
-                    onChange={(e) => update(idx, { options: q.options.map((o, i) => (i === oi ? e.target.value : o)) })}
+                    onChange={(e) => update(q.id, (cur) => ({ options: cur.options.map((o, i) => (i === oi ? e.target.value : o)) }))}
                     style={inputStyle}
                   />
                   {q.options.length > 2 && (
                     <button
-                      onClick={() => update(idx, { options: q.options.filter((_, i) => i !== oi) })}
+                      onClick={() => update(q.id, (cur) => ({ options: cur.options.filter((_, i) => i !== oi) }))}
                       className="cursor-pointer bg-transparent text-muted"
                       style={{ border: 'none', fontSize: 18 }}
                     >
@@ -122,7 +141,7 @@ function QuestionBuilder({
                 </div>
               ))}
               <button
-                onClick={() => update(idx, { options: [...q.options, ''] })}
+                onClick={() => update(q.id, (cur) => ({ options: [...cur.options, ''] }))}
                 className="cursor-pointer bg-transparent self-start"
                 style={{ border: '1.5px dashed rgba(255,255,255,.16)', color: '#6B7A99', borderRadius: 9, padding: '8px 14px', fontWeight: 800, fontSize: 13 }}
               >
@@ -132,7 +151,7 @@ function QuestionBuilder({
           </Card>
         ))}
         <button
-          onClick={() => setQuestions([...questions, { id: newId(), label: '', options: ['', ''] }])}
+          onClick={() => setQuestions((qs) => [...qs, { id: newId(), label: '', options: ['', ''] }])}
           className="cursor-pointer bg-transparent font-extrabold"
           style={{ border: '1.5px dashed rgba(231,201,47,.4)', color: '#E7C92F', borderRadius: 11, padding: 14, fontSize: 13.5 }}
         >
@@ -207,7 +226,10 @@ export function GameBuilder() {
     // A pasted link only becomes a poster once it's been fetched and re-hosted. Publishing
     // with one still in the box used to discard it silently, so the game went live with no
     // posters and no explanation.
-    const stillPending = Object.values(pendingPosters).filter(Boolean).length;
+    // Count only questions that are still on the page. A flag left behind by a removed row
+    // would otherwise block publish permanently, and the message below would point at a link
+    // box the admin can no longer see — unrecoverable without reloading and losing the card.
+    const stillPending = matches.filter((m) => pendingPosters[m.id]).length;
     if (stillPending > 0) {
       setError(
         `${stillPending} poster ${stillPending === 1 ? 'link is' : 'links are'} still being added. ` +

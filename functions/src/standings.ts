@@ -58,8 +58,8 @@ export const sendNightStandings = onCall<{ gameId?: string; night?: number }>(as
     );
   }
 
-  // Already sent. Checked server-side, not just by a disabled button — the failure mode
-  // here is mailing the whole pod twice.
+  // Fast, friendly rejection for the common case. This is NOT the authoritative check — two
+  // racing calls can both pass it. The binding one is the transaction below.
   if ((game.standingsSentFor ?? []).includes(night)) {
     throw new HttpsError('already-exists', `Night ${night} standings have already been sent.`);
   }
@@ -104,12 +104,73 @@ export const sendNightStandings = onCall<{ gameId?: string; night?: number }>(as
     );
   }
 
-  // Claim the night BEFORE sending. If the send partially fails we'd rather under-send than
-  // let a retry mail everyone a second time; per-recipient failures are logged to emailLog.
-  await gameSnap.ref.update({ standingsSentFor: FieldValue.arrayUnion(night) });
+  // Claim the night BEFORE sending, so a double-click or a second admin can't mail everyone
+  // twice. The read and the write must be atomic: checking the snapshot fetched at the top of
+  // this function and then writing would let two racing calls both pass the check and both
+  // send. Whoever loses the transaction gets 'already-exists' and never reaches the send —
+  // which is also what makes the rollback below safe, since only the winner can roll back.
+  await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(gameSnap.ref);
+    const sentFor = (fresh.data()?.standingsSentFor as number[] | undefined) ?? [];
+    if (sentFor.includes(night)) {
+      throw new HttpsError('already-exists', `Night ${night} standings have already been sent.`);
+    }
+    tx.update(gameSnap.ref, { standingsSentFor: FieldValue.arrayUnion(night) });
+  });
 
-  await sendStandingsEmail(gameId, game, 'interim', night);
-  logger.info(`Night ${night} standings sent for game ${gameId} to ${entryCount} player(s) by ${uid}.`);
+  const outcome = await sendStandingsEmail(gameId, game, 'interim', night);
 
-  return { sent: true, night, recipients: entryCount };
+  // A TOTAL failure is a different case, and it used to be invisible: every per-recipient send
+  // is caught and logged, so a bad API key, an unverified domain or a Resend outage failed all
+  // of them while this function still returned success — with the night permanently burned and
+  // the button disabled forever. Release the claim so the admin can genuinely retry, and fail
+  // loudly rather than reporting a send that never happened.
+  //
+  // A PARTIAL failure keeps the claim: retrying would mail the successful recipients twice, so
+  // we under-send deliberately and report the count back instead. Failures land in emailLog.
+  if (outcome.delivered === 0) {
+    // The release can itself fail. If it does, the night stays claimed and the admin is in
+    // exactly the stuck state this whole change exists to prevent — so say so explicitly
+    // rather than letting a raw Firestore error surface as if the send were the problem.
+    let released = true;
+    try {
+      await gameSnap.ref.update({ standingsSentFor: FieldValue.arrayRemove(night) });
+    } catch (err) {
+      released = false;
+      logger.error(`Could not release the Night ${night} claim on game ${gameId}.`, err);
+    }
+    logger.error(
+      `Night ${night} standings for game ${gameId} reached nobody (claim ${released ? 'released' : 'STUCK'}).`,
+      outcome,
+    );
+    if (!released) {
+      throw new HttpsError(
+        'internal',
+        `Couldn't send the Night ${night} standings, and couldn't undo the attempt. ` +
+          'The button will stay disabled for this night until it\'s cleared manually — tell your organizer.',
+      );
+    }
+    throw new HttpsError(
+      'internal',
+      outcome.configured
+        ? `Couldn't send the Night ${night} standings — no email reached anyone. Nothing was recorded, so you can try again.`
+        : 'Email isn\'t configured for this environment (RESEND_API_KEY is not set), so no standings were sent.',
+    );
+  }
+
+  logger.info(
+    `Night ${night} standings sent for game ${gameId} by ${uid}: ` +
+      `${outcome.delivered} delivered, ${outcome.failed} failed, ${outcome.noAddress} without an address.`,
+  );
+
+  // noAddress travels with the rest. A player with no email on their user doc gets nothing,
+  // and dropping that count here would have left the admin reading a clean "standings sent"
+  // while part of the pod heard nothing — the exact failure this whole change is about.
+  return {
+    sent: true,
+    night,
+    recipients: outcome.delivered,
+    failed: outcome.failed,
+    noAddress: outcome.noAddress,
+  };
 });

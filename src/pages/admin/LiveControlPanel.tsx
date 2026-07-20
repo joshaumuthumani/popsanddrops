@@ -36,6 +36,7 @@ function NightStandingsButton({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
+  const [partial, setPartial] = useState('');
 
   const isFinalNight = night.day >= nightCount(game);
   if (isFinalNight) return null; // covered by the close-game results email
@@ -47,10 +48,25 @@ function NightStandingsButton({
 
   const send = async () => {
     setError('');
+    setPartial('');
     setBusy(true);
     try {
-      await sendNightStandings(game.id, night.day);
+      const { recipients, failed, noAddress } = await sendNightStandings(game.id, night.day);
       setSent(true);
+      // Some players got it and some didn't. The night stays claimed (a retry would mail the
+      // successful ones twice), so this notice is the admin's only signal that it happened.
+      // Two distinct shortfalls, and they need different actions: a failed send might be worth
+      // chasing, while "no email on file" is something only that player can fix.
+      const shortfalls = [
+        failed > 0 && `${failed} ${failed === 1 ? 'email' : 'emails'} failed to send`,
+        noAddress > 0 &&
+          `${noAddress} ${noAddress === 1 ? 'player has' : 'players have'} no email on file`,
+      ].filter(Boolean);
+      setPartial(
+        shortfalls.length > 0
+          ? `Sent to ${recipients} ${recipients === 1 ? 'player' : 'players'} — but ${shortfalls.join(', and ')}.`
+          : '',
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send standings.');
     } finally {
@@ -95,6 +111,7 @@ function NightStandingsButton({
         </p>
       )}
       {error && <p style={{ color: '#C0392B', fontSize: 12, marginTop: 6 }}>{error}</p>}
+      {partial && <p style={{ color: 'var(--color-gold)', fontSize: 12, marginTop: 6 }}>{partial}</p>}
     </div>
   );
 }

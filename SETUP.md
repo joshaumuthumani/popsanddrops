@@ -65,6 +65,35 @@ SSRF, oversized responses, and non-image content.
 Posters are set at **creation time only** — there is no edit-game flow. Rules live in
 `storage.rules`. Design: `docs/superpowers/specs/2026-07-18-match-posters-design.md`.
 
+## Tests
+
+```bash
+npm test        # unit + component tests (vitest, jsdom)
+npm run test:e2e  # Firestore rules against the emulator suite
+npm run lint
+```
+
+`npm test` is fast and needs nothing installed. `npm run test:e2e` boots the Firebase
+emulators, which are **JVM processes** — `firebase-tools` requires **JDK 21 or above** and
+fails outright below it:
+
+```bash
+brew install openjdk@21
+export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"   # keg-only; add to your shell profile
+```
+
+The split is deliberate. The rules tests cover the things a unit test and demo mode
+structurally cannot reach: collection-group authorization, the server-clock pick lock, and the
+closed-game freeze. Every serious bug this project has shipped lived in exactly that layer, and
+each one passed a typecheck on the way out.
+
+`tests/scoring-mirror.test.ts` runs `src/lib/scoring.ts` and `functions/src/scoring.ts` over
+identical fixtures and asserts they agree. That turns the "these two files are mirrors" rule in
+[CLAUDE.md](CLAUDE.md) from something a contributor has to remember into a build failure.
+
+CI (`.github/workflows/ci.yml`) runs typecheck, lint, unit tests, build, and the emulator rules
+tests on every push and pull request. There is no skip path.
+
 ## Design language
 
 Dark navy/black with gold/cyan/red accents pulled from the CodWrestlePod logo; Bebas Neue
