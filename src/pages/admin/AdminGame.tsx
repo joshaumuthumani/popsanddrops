@@ -9,6 +9,7 @@ import { DeleteGameDialog } from '@/components/DeleteGameDialog';
 import { useGame } from '@/hooks/data';
 import { useAuth } from '@/context/AuthContext';
 import { subscribeSubmissions } from '@/lib/store';
+import { isFirebaseConfigured } from '@/lib/firebase';
 
 type Screen = 'dash' | 'live' | 'players';
 
@@ -23,8 +24,10 @@ export function AdminGame() {
   const [playerCount, setPlayerCount] = useState(0);
 
   // Live submission count, purely to tell the delete dialog how much it's about to destroy.
+  // Guarded on isFirebaseConfigured: subscribeSubmissions calls reqDb(), which throws in demo
+  // mode — an unguarded call would crash the whole console instead of degrading quietly.
   useEffect(() => {
-    if (!gameId) return;
+    if (!gameId || !isFirebaseConfigured) return;
     return subscribeSubmissions(gameId, (subs) => setPlayerCount(subs.length));
   }, [gameId]);
 

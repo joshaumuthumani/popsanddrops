@@ -6,6 +6,7 @@ import { draftFromGame } from '@/pages/admin/gameFormState';
 import { subscribeSubmissions, updateGame, type NewGameInput } from '@/lib/store';
 import { gameQuestions, orphanImpact, type OrphanImpact } from '@/lib/pickIntegrity';
 import { useGame } from '@/hooks/data';
+import { isFirebaseConfigured } from '@/lib/firebase';
 import type { Submission } from '@/types';
 
 /** Super-Admin edit of a live game. Route is gated superAdminOnly; rules enforce it too. */
@@ -18,8 +19,10 @@ export function EditGame() {
   // form's submit continue (Save anyway) or abort (Cancel).
   const [pending, setPending] = useState<{ impact: OrphanImpact; resolve: (ok: boolean) => void } | null>(null);
 
+  // Guarded on isFirebaseConfigured — subscribeSubmissions calls reqDb(), which throws in
+  // demo mode. Without picks data the orphan warning simply never fires (nothing to orphan).
   useEffect(() => {
-    if (!game) return;
+    if (!game || !isFirebaseConfigured) return;
     return subscribeSubmissions(game.id, setSubs);
   }, [game]);
 
