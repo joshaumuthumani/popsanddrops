@@ -12,14 +12,35 @@ interface MatchCardProps {
   onPick: (option: string) => void;
 }
 
+/** Small "this question changed after you locked in" marker. */
+function ChangedTag() {
+  return (
+    <span
+      style={{
+        fontSize: 9.5,
+        fontWeight: 800,
+        letterSpacing: '.08em',
+        color: 'var(--color-gold)',
+        background: 'rgba(231,201,47,.14)',
+        padding: '3px 8px',
+        borderRadius: 999,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      CHANGED — RE-PICK
+    </span>
+  );
+}
+
 /** Match name, plus a "pick 1 of N" hint once there are more than two competitors. */
-function MatchHeader({ match, centered }: { match: Match; centered: boolean }) {
+function MatchHeader({ match, centered, flagged }: { match: Match; centered: boolean; flagged?: boolean }) {
   return (
     <div
       className={`flex items-center gap-2.5 flex-wrap ${centered ? 'justify-center' : 'justify-between'}`}
       style={{ marginBottom: 12 }}
     >
       <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#6B7A99' }}>{match.name}</span>
+      {flagged && <ChangedTag />}
       {match.options.length > 2 && (
         <span
           style={{
@@ -87,11 +108,11 @@ function MatchOptions({ match, selected, onPick, stacked }: MatchCardProps & { s
  * One match. With a poster the card splits — art on the left, choices stacked on the right
  * (collapsing to poster-on-top when narrow). Without one it renders as it always has.
  */
-function MatchCard({ match, selected, onPick }: MatchCardProps) {
+function MatchCard({ match, selected, onPick, flagged }: MatchCardProps & { flagged?: boolean }) {
   if (!match.posterUrl) {
     return (
       <Card style={{ padding: '16px 18px' }}>
-        <MatchHeader match={match} centered={false} />
+        <MatchHeader match={match} centered={false} flagged={flagged} />
         <MatchOptions match={match} selected={selected} onPick={onPick} stacked={false} />
       </Card>
     );
@@ -102,7 +123,7 @@ function MatchCard({ match, selected, onPick }: MatchCardProps) {
       <div className="poster-split">
         <img className="poster-split__img" src={match.posterUrl} alt={match.name} loading="lazy" />
         <div className="poster-split__body">
-          <MatchHeader match={match} centered />
+          <MatchHeader match={match} centered flagged={flagged} />
           <div className="poster-split__options">
             <MatchOptions match={match} selected={selected} onPick={onPick} stacked />
           </div>
@@ -120,6 +141,8 @@ interface Props {
   /** When true, the show has locked — picks are read-only (PRD §4.4). */
   locked?: boolean;
   saving?: boolean;
+  /** Question ids a live edit left needing attention (orphaned pick or newly-added question). */
+  needsAttention?: string[];
   /** Must reject on failure — the confirmation toast waits on this promise. */
   onSubmit?: (picks: {
     matchPicks: Record<string, string>;
@@ -136,8 +159,10 @@ export function MakePicks({
   initialTiebreaker = '',
   locked = false,
   saving = false,
+  needsAttention = [],
   onSubmit,
 }: Props) {
+  const flagged = useMemo(() => new Set(needsAttention), [needsAttention]);
   const [matchPicks, setMatchPicks] = useState<Record<string, string>>(initialMatchPicks);
   const [propPicks, setPropPicks] = useState<Record<string, string>>(initialPropPicks);
   const [tiebreaker, setTiebreaker] = useState(initialTiebreaker);
@@ -216,6 +241,27 @@ export function MakePicks({
         />
       </div>
 
+      {flagged.size > 0 && (
+        <div
+          style={{
+            background: 'rgba(231,201,47,.1)',
+            border: '1px solid rgba(231,201,47,.4)',
+            borderRadius: 12,
+            padding: '12px 16px',
+            marginBottom: 18,
+          }}
+        >
+          <div style={{ fontWeight: 900, fontSize: 11, letterSpacing: '.12em', color: 'var(--color-gold)', marginBottom: 3 }}>
+            THIS GAME CHANGED
+          </div>
+          <div style={{ fontSize: 13, color: '#C8D4E8' }}>
+            {locked
+              ? 'An admin changed this game after you locked in. The picks marked below no longer count.'
+              : 'An admin changed this game after you locked in. Re-check the picks marked below and lock in again before the countdown ends.'}
+          </div>
+        </div>
+      )}
+
       {/* progress */}
       <div className="flex items-center gap-3.5" style={{ marginBottom: 18 }}>
         <div style={{ flex: 1, height: 7, borderRadius: 4, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
@@ -247,7 +293,7 @@ export function MakePicks({
               <SectionLabel style={{ margin: '6px 0 14px' }}>Match predictions · 1 Pop each</SectionLabel>
               <div className="flex flex-col gap-3" style={{ marginBottom: 30 }}>
                 {night.matches.map((m) => (
-                  <MatchCard key={m.id} match={m} selected={matchPicks[m.id]} onPick={(opt) => setMatch(m.id, opt)} />
+                  <MatchCard key={m.id} match={m} selected={matchPicks[m.id]} onPick={(opt) => setMatch(m.id, opt)} flagged={flagged.has(m.id)} />
                 ))}
               </div>
             </>
@@ -259,7 +305,10 @@ export function MakePicks({
               <div className="flex flex-col gap-3" style={{ marginBottom: 18 }}>
                 {night.propBets.map((p) => (
                   <Card key={p.id} style={{ padding: '16px 18px' }} className="flex items-center justify-between gap-4 flex-wrap">
-                    <div style={{ fontWeight: 700, fontSize: 14.5, color: '#C8D4E8' }}>{p.question}</div>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <div style={{ fontWeight: 700, fontSize: 14.5, color: '#C8D4E8' }}>{p.question}</div>
+                      {flagged.has(p.id) && <ChangedTag />}
+                    </div>
                     <div className="flex gap-2 flex-wrap">
                       {p.options.map((opt) => (
                         <button

@@ -8,7 +8,15 @@ import { AppHeader } from '@/components/AppHeader';
  * non-admins hitting an admin-only route are redirected to the User dashboard
  * (PRD §5.1, §10.1).
  */
-export function ProtectedRoute({ children, adminOnly = false }: { children: ReactNode; adminOnly?: boolean }) {
+export function ProtectedRoute({
+  children,
+  adminOnly = false,
+  superAdminOnly = false,
+}: {
+  children: ReactNode;
+  adminOnly?: boolean;
+  superAdminOnly?: boolean;
+}) {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -25,8 +33,13 @@ export function ProtectedRoute({ children, adminOnly = false }: { children: Reac
   }
 
   const isAdmin = user.role === 'admin' || user.role === 'superadmin';
-  if (adminOnly && !isAdmin) {
+  if ((adminOnly || superAdminOnly) && !isAdmin) {
     return <Navigate to="/app" replace />;
+  }
+  // A plain admin who reaches a super-admin-only route (e.g. edit game) lands back in the
+  // admin console rather than the user app — they belong in the console, just not here.
+  if (superAdminOnly && user.role !== 'superadmin') {
+    return <Navigate to="/admin" replace />;
   }
 
   return (

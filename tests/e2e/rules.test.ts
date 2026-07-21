@@ -266,12 +266,12 @@ describe('closed games are frozen', () => {
 describe('the shared-admin model', () => {
   // Access is by global role, never by createdBy or per-game membership. A freshly
   // promoted admin who saw an empty console was a real bug here.
-  it('lets any admin edit a game they did not create', async () => {
+  it('lets any admin close a game they did not create', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'users/admin2'), { role: 'admin', displayName: 'Other' });
     });
     const db = testEnv.authenticatedContext('admin2').firestore();
-    await assertSucceeds(setDoc(doc(db, 'games/openGame'), { status: 'LOCKED' }, { merge: true }));
+    await assertSucceeds(setDoc(doc(db, 'games/openGame'), { status: 'CLOSED' }, { merge: true }));
   });
 
   it('refuses a plain user editing a game', async () => {
@@ -304,6 +304,66 @@ describe('role escalation', () => {
     const db = asSuper();
     await assertSucceeds(
       setDoc(doc(db, 'users/player1'), { role: 'admin', displayName: 'Player One' }),
+    );
+  });
+});
+
+describe('editing a live game is super-admin-only', () => {
+  // Any admin may CLOSE a game (status + tiebreaker). Structural edits — matches, props,
+  // lockTime, name — are a Super-Admin-only action. This is the trust-boundary half of the
+  // "editing is super-admin-only" feature; the UI gate is convenience on top.
+  it('lets any admin close a game (status + tiebreaker only)', async () => {
+    const db = asAdmin();
+    await assertSucceeds(
+      setDoc(doc(db, 'games/openGame'), { status: 'CLOSED', tiebreakerAnswer: '12' }, { merge: true }),
+    );
+  });
+
+  it('refuses a plain admin changing a structural field (matches)', async () => {
+    const db = asAdmin();
+    await assertFails(
+      setDoc(
+        doc(db, 'games/openGame'),
+        { matches: [{ id: 'm1', name: 'X', options: ['a', 'b'] }] },
+        { merge: true },
+      ),
+    );
+  });
+
+  it('refuses a plain admin setting status to a non-CLOSED value', async () => {
+    // The close branch is a true close gate: touching status/tiebreaker is only allowed when
+    // the result is CLOSED. A plain admin must not flip status to 'LOCKED' before lockTime —
+    // that would expose everyone's picks early via gameLocked().
+    const db = asAdmin();
+    await assertFails(setDoc(doc(db, 'games/openGame'), { status: 'LOCKED' }, { merge: true }));
+  });
+
+  it('refuses a plain admin writing tiebreakerAnswer without closing', async () => {
+    // Pre-revealing the tiebreaker while the game is still OPEN (world-readable) is blocked —
+    // tiebreakerAnswer may only be written as part of the close.
+    const db = asAdmin();
+    await assertFails(setDoc(doc(db, 'games/openGame'), { tiebreakerAnswer: '12' }, { merge: true }));
+  });
+
+  it('lets a super admin change a structural field on an OPEN game', async () => {
+    const db = asSuper();
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'games/openGame'),
+        { matches: [{ id: 'm1', name: 'X', options: ['a', 'b'] }], lockTime: LOCK_TIME },
+        { merge: true },
+      ),
+    );
+  });
+
+  it('refuses even a super admin editing a CLOSED game', async () => {
+    const db = asSuper();
+    await assertFails(
+      setDoc(
+        doc(db, 'games/closedGame'),
+        { matches: [{ id: 'm1', name: 'X', options: ['a', 'b'] }] },
+        { merge: true },
+      ),
     );
   });
 });

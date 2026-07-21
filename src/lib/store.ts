@@ -160,6 +160,33 @@ export async function createGame(input: NewGameInput, creator: UserProfile): Pro
   return ref.id;
 }
 
+/**
+ * The subset of a game an edit may change. Deliberately excludes identity and lifecycle
+ * fields (status/createdBy/admins/joinCode/createdAt/tiebreakerAnswer/standingsSentFor):
+ * status transitions belong to closeGame, and the rest are set once at creation. Exported
+ * as a pure function so the field selection can be unit-tested without a live Firestore.
+ */
+export function gameUpdateFields(input: NewGameInput) {
+  return {
+    name: input.name.trim(),
+    promotion: input.promotion.trim(),
+    eventDate: input.eventDate,
+    lockTime: input.lockTime,
+    dayCount: Math.max(1, input.dayCount || 1),
+    matches: input.matches,
+    propBets: input.propBets,
+    tiebreakerQuestion: input.tiebreakerQuestion.trim(),
+  };
+}
+
+/**
+ * Super-Admin edit of a live game. The Firestore rules enforce the actual gate (superadmin +
+ * non-CLOSED); this just writes the editable fields. A plain admin's call is denied server-side.
+ */
+export async function updateGame(gameId: string, input: NewGameInput): Promise<void> {
+  await updateDoc(doc(reqDb(), 'games', gameId), gameUpdateFields(input));
+}
+
 // ---------- submissions ----------
 
 export function subscribeMySubmission(
@@ -274,6 +301,17 @@ export async function sendNightStandings(
     failed: data.failed ?? 0,
     noAddress: data.noAddress ?? 0,
   };
+}
+
+/**
+ * Super-Admin-only hard delete via the callable — the Admin SDK does the recursive delete of
+ * the game and all five subcollections, which the client cannot do itself (submissions have
+ * `allow delete: if false`). Throws in demo mode and on any server-side rejection.
+ */
+export async function deleteGameById(gameId: string): Promise<void> {
+  if (!functions) throw new Error('Deleting a game needs a live Firebase connection.');
+  const callable = httpsCallable<{ gameId: string }, { deleted: boolean }>(functions, 'deleteGame');
+  await callable({ gameId });
 }
 
 export function subscribeUsers(cb: (users: UserProfile[]) => void): Unsub {
