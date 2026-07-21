@@ -9,10 +9,13 @@ on:
   pull_request:
 
 concurrency:
-  # Supersede in-flight runs for the same ref. Deliberately unconditional: an earlier version
-  # tried to exempt the default branch via an expression over github.event.repository, which
-  # made the whole workflow fail to start (startup_failure, before any job ran). A cancelled
-  # run still appears in the Actions log, so nothing is actually lost by superseding.
+  # Supersede in-flight runs for the same ref. Kept unconditional for simplicity. An earlier
+  # version guarded cancellation on the default branch with an expression over
+  # github.event.repository, and a commit message once blamed that expression for a
+  # startup_failure — but that was a misdiagnosis. A run on THIS unconditional version
+  # (29711706477, commit 3078588) still hit startup_failure, which rules the expression out:
+  # the real cause was a GitHub Actions service outage, not the config. A cancelled run still
+  # appears in the Actions log, so nothing is lost by superseding.
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
