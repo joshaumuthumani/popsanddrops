@@ -303,6 +303,17 @@ export async function sendNightStandings(
   };
 }
 
+/**
+ * Super-Admin-only hard delete via the callable — the Admin SDK does the recursive delete of
+ * the game and all five subcollections, which the client cannot do itself (submissions have
+ * `allow delete: if false`). Throws in demo mode and on any server-side rejection.
+ */
+export async function deleteGameById(gameId: string): Promise<void> {
+  if (!functions) throw new Error('Deleting a game needs a live Firebase connection.');
+  const callable = httpsCallable<{ gameId: string }, { deleted: boolean }>(functions, 'deleteGame');
+  await callable({ gameId });
+}
+
 export function subscribeUsers(cb: (users: UserProfile[]) => void): Unsub {
   return onSnapshot(collection(reqDb(), 'users'), (snap) =>
     cb(
