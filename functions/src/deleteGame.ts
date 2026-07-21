@@ -7,6 +7,7 @@
 // delete events, so onResultWrite / onGameClose do not fire during a delete.
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import * as logger from 'firebase-functions/logger';
 import { getFirestore } from 'firebase-admin/firestore';
 
 export const deleteGame = onCall<{ gameId?: string }>(async (request) => {
@@ -20,13 +21,23 @@ export const deleteGame = onCall<{ gameId?: string }>(async (request) => {
   }
 
   const gameId = request.data?.gameId;
-  if (typeof gameId !== 'string' || !gameId) {
+  // Reject a '/' so a multi-segment id can't retarget a sub-path (defense in depth — only a
+  // super admin reaches here, but keep the target a single top-level game doc).
+  if (typeof gameId !== 'string' || !gameId || gameId.includes('/')) {
     throw new HttpsError('invalid-argument', 'Which game?');
   }
   if (!(await db.doc(`games/${gameId}`).get()).exists) {
     throw new HttpsError('not-found', 'That game no longer exists.');
   }
 
-  await db.recursiveDelete(db.doc(`games/${gameId}`));
+  try {
+    await db.recursiveDelete(db.doc(`games/${gameId}`));
+  } catch (err) {
+    // recursiveDelete runs a BulkWriter over the whole subtree; a mid-way failure can leave
+    // some docs behind. Log with context and report honestly. recursiveDelete is idempotent,
+    // so a retry re-drives the delete over whatever remains (the game doc is still present).
+    logger.error(`deleteGame failed for game ${gameId}`, err);
+    throw new HttpsError('internal', "Delete didn't finish — some data may remain. Please try again.");
+  }
   return { deleted: true };
 });

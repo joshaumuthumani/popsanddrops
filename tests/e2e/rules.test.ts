@@ -266,12 +266,12 @@ describe('closed games are frozen', () => {
 describe('the shared-admin model', () => {
   // Access is by global role, never by createdBy or per-game membership. A freshly
   // promoted admin who saw an empty console was a real bug here.
-  it('lets any admin edit a game they did not create', async () => {
+  it('lets any admin close a game they did not create', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'users/admin2'), { role: 'admin', displayName: 'Other' });
     });
     const db = testEnv.authenticatedContext('admin2').firestore();
-    await assertSucceeds(setDoc(doc(db, 'games/openGame'), { status: 'LOCKED' }, { merge: true }));
+    await assertSucceeds(setDoc(doc(db, 'games/openGame'), { status: 'CLOSED' }, { merge: true }));
   });
 
   it('refuses a plain user editing a game', async () => {
@@ -328,6 +328,21 @@ describe('editing a live game is super-admin-only', () => {
         { merge: true },
       ),
     );
+  });
+
+  it('refuses a plain admin setting status to a non-CLOSED value', async () => {
+    // The close branch is a true close gate: touching status/tiebreaker is only allowed when
+    // the result is CLOSED. A plain admin must not flip status to 'LOCKED' before lockTime —
+    // that would expose everyone's picks early via gameLocked().
+    const db = asAdmin();
+    await assertFails(setDoc(doc(db, 'games/openGame'), { status: 'LOCKED' }, { merge: true }));
+  });
+
+  it('refuses a plain admin writing tiebreakerAnswer without closing', async () => {
+    // Pre-revealing the tiebreaker while the game is still OPEN (world-readable) is blocked —
+    // tiebreakerAnswer may only be written as part of the close.
+    const db = asAdmin();
+    await assertFails(setDoc(doc(db, 'games/openGame'), { tiebreakerAnswer: '12' }, { merge: true }));
   });
 
   it('lets a super admin change a structural field on an OPEN game', async () => {

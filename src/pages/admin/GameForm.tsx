@@ -253,8 +253,12 @@ export function GameForm({ initial, submitLabel, busyLabel, onSubmit, onCancel, 
     setBusy(true);
     try {
       await onSubmit(input);
-    } catch {
-      setError('Could not save the game. Please try again.');
+    } catch (err) {
+      // Surface the real reason and leave a trace. Collapsing every failure into one generic
+      // "try again" masked cases where a retry can never work (e.g. the game was closed by
+      // another admin mid-edit → permission-denied), with nothing logged to debug it.
+      console.error('Game save failed', err);
+      setError(err instanceof Error && err.message ? err.message : 'Could not save the game. Please try again.');
     } finally {
       setBusy(false);
     }

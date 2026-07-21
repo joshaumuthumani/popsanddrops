@@ -256,7 +256,7 @@ export function MakePicks({
           </div>
           <div style={{ fontSize: 13, color: '#C8D4E8' }}>
             {locked
-              ? 'An admin changed this game after you locked in. The picks marked below can no longer be scored.'
+              ? 'An admin changed this game after you locked in. The picks marked below no longer count.'
               : 'An admin changed this game after you locked in. Re-check the picks marked below and lock in again before the countdown ends.'}
           </div>
         </div>

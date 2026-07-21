@@ -15,15 +15,21 @@ export function EditGame() {
   const navigate = useNavigate();
   const { game, loading } = useGame(gameId);
   const [subs, setSubs] = useState<Submission[]>([]);
+  const [subsLoaded, setSubsLoaded] = useState(false);
+  const [notice, setNotice] = useState('');
   // A pending orphan confirmation: holds the impact to show and the resolver that lets the
   // form's submit continue (Save anyway) or abort (Cancel).
   const [pending, setPending] = useState<{ impact: OrphanImpact; resolve: (ok: boolean) => void } | null>(null);
 
   // Guarded on isFirebaseConfigured — subscribeSubmissions calls reqDb(), which throws in
-  // demo mode. Without picks data the orphan warning simply never fires (nothing to orphan).
+  // demo mode. subsLoaded flips on the first snapshot so the orphan check can distinguish
+  // "no picks affected" from "picks not loaded yet" (see beforeSubmit).
   useEffect(() => {
     if (!game || !isFirebaseConfigured) return;
-    return subscribeSubmissions(game.id, setSubs);
+    return subscribeSubmissions(game.id, (next) => {
+      setSubs(next);
+      setSubsLoaded(true);
+    });
   }, [game]);
 
   if (loading) return <p className="text-muted">Loading…</p>;
@@ -33,6 +39,14 @@ export function EditGame() {
   // Runs before the form commits. If the edit would orphan any existing picks, surface the
   // impact and wait for the admin's decision; a clean edit passes straight through.
   const beforeSubmit = (input: NewGameInput): Promise<boolean> => {
+    // Don't let the orphan check fail open: if picks haven't loaded yet, `subs` is still empty
+    // and the warning would wrongly report "0 affected". Block with a notice rather than
+    // silently saving unverified.
+    if (isFirebaseConfigured && !subsLoaded) {
+      setNotice("Still loading players' picks — try again in a moment.");
+      return Promise.resolve(false);
+    }
+    setNotice('');
     const impact = orphanImpact(gameQuestions(input), subs);
     if (impact.totalAffected === 0) return Promise.resolve(true);
     return new Promise<boolean>((resolve) => setPending({ impact, resolve }));
@@ -47,6 +61,13 @@ export function EditGame() {
         <PageTitle>Edit {game.name}</PageTitle>
       </div>
 
+      {!isFirebaseConfigured && (
+        <p style={{ color: '#6B7A99', fontSize: 13, marginBottom: 16 }}>
+          Editing needs a live Firebase connection — changes can't be saved in demo mode.
+        </p>
+      )}
+      {notice && <p style={{ color: 'var(--color-gold)', fontSize: 13, marginBottom: 16 }}>{notice}</p>}
+
       <GameForm
         initial={draftFromGame(game)}
         submitLabel="Save changes"
@@ -55,7 +76,19 @@ export function EditGame() {
         beforeSubmit={beforeSubmit}
         onCancel={() => navigate(`/admin/game/${game.id}`)}
         onSubmit={async (input) => {
-          await updateGame(game.id, input);
+          if (!isFirebaseConfigured) {
+            throw new Error('Editing needs a live Firebase connection — unavailable in demo mode.');
+          }
+          try {
+            await updateGame(game.id, input);
+          } catch (err) {
+            // A game closed by another admin between load and save can never be re-edited —
+            // say so plainly instead of the generic "try again".
+            if (err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'permission-denied') {
+              throw new Error('This game can no longer be edited — it may have just been closed.');
+            }
+            throw err;
+          }
           navigate(`/admin/game/${game.id}`);
         }}
       />

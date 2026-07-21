@@ -86,17 +86,22 @@ service cloud.firestore {
       // Any admin can create a game; they must own createdBy.
       allow create: if isAdmin()
                     && request.resource.data.createdBy == uid();
-      // Any admin may CLOSE a game (status + tiebreakerAnswer only) — the pre-write status is
-      // not yet CLOSED, so the close itself is allowed. Broader, STRUCTURAL edits (matches,
-      // props, lockTime, name…) are a Super-Admin-only action. A CLOSED game is frozen for
-      // everyone. `standingsSentFor` is written by the sendNightStandings callable via the
-      // Admin SDK (which bypasses these rules), so it need not appear in the admin-close set.
+      // Any admin may CLOSE a game — and ONLY close it. The plain-admin branch is a true
+      // close gate: it may touch only `status`/`tiebreakerAnswer` AND the resulting status
+      // must be 'CLOSED'. Without the value check it was merely a which-keys gate, letting a
+      // plain admin set status to e.g. 'LOCKED' before lockTime (exposing everyone's picks via
+      // gameLocked()) or write tiebreakerAnswer while OPEN (pre-revealing it). closeGame is the
+      // only client write that touches these fields and it always sets status 'CLOSED', so no
+      // legitimate write is blocked. Broader STRUCTURAL edits (matches, props, lockTime, name…)
+      // are Super-Admin-only. A CLOSED game is frozen for everyone. `standingsSentFor` is
+      // written by the sendNightStandings callable via the Admin SDK (bypasses these rules).
       allow update: if resource.data.status != 'CLOSED'
                     && (
                       isSuperAdmin()
                       || (isAdmin()
                           && request.resource.data.diff(resource.data)
-                               .affectedKeys().hasOnly(['status', 'tiebreakerAnswer']))
+                               .affectedKeys().hasOnly(['status', 'tiebreakerAnswer'])
+                          && request.resource.data.status == 'CLOSED')
                     );
       // Deleting a game is a Super-Admin-only governance action.
       allow delete: if isSuperAdmin();
