@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useGame, useMySubmission, useResults, useLeaderboard, isLocked } from '@/hooks/data';
 import { saveSubmission, type SubmissionInput } from '@/lib/store';
 import { isFirebaseConfigured } from '@/lib/firebase';
+import { gameQuestions, orphanedPickIds, submissionPicks, unansweredQuestionIds } from '@/lib/pickIntegrity';
 
 type Screen = 'predict' | 'live';
 
@@ -27,6 +28,18 @@ export function UserGame() {
   const [saving, setSaving] = useState(false);
 
   const locked = game ? isLocked(game) : false;
+
+  // Questions a super-admin edit has left needing the player's attention: a saved pick whose
+  // option was renamed/removed, or a question added after they locked in. Only meaningful once
+  // they've submitted — a player who never picked isn't "changed", just new. Derived from
+  // current state, so no edit history is stored.
+  const needsAttention =
+    game && submission
+      ? [
+          ...orphanedPickIds(gameQuestions(game), submissionPicks(submission)),
+          ...unansweredQuestionIds(gameQuestions(game), submissionPicks(submission)),
+        ]
+      : [];
 
   // Once locked there's nothing to submit — land on the live board.
   useEffect(() => {
@@ -80,6 +93,7 @@ export function UserGame() {
           locked={locked}
           saving={saving}
           onSubmit={handleSubmit}
+          needsAttention={needsAttention}
         />
       ) : (
         <PopRankings
