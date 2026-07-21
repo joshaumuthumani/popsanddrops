@@ -7,6 +7,7 @@ import { UserGame } from '@/pages/user/UserGame';
 import { AdminGames } from '@/pages/admin/AdminGames';
 import { AdminGame } from '@/pages/admin/AdminGame';
 import { GameBuilder } from '@/pages/admin/GameBuilder';
+import { EditGame } from '@/pages/admin/EditGame';
 import { CloseGame } from '@/pages/admin/CloseGame';
 import { AdminManagement } from '@/pages/admin/AdminManagement';
 
@@ -25,6 +26,7 @@ export default function App() {
       <Route path="/admin" element={<ProtectedRoute adminOnly><AdminGames /></ProtectedRoute>} />
       <Route path="/admin/new" element={<ProtectedRoute adminOnly><GameBuilder /></ProtectedRoute>} />
       <Route path="/admin/game/:gameId" element={<ProtectedRoute adminOnly><AdminGame /></ProtectedRoute>} />
+      <Route path="/admin/game/:gameId/edit" element={<ProtectedRoute superAdminOnly><EditGame /></ProtectedRoute>} />
       <Route path="/admin/game/:gameId/close" element={<ProtectedRoute adminOnly><CloseGame /></ProtectedRoute>} />
       <Route path="/admin/manage" element={<ProtectedRoute adminOnly><AdminManagement /></ProtectedRoute>} />
 
