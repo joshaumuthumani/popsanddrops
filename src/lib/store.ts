@@ -160,6 +160,33 @@ export async function createGame(input: NewGameInput, creator: UserProfile): Pro
   return ref.id;
 }
 
+/**
+ * The subset of a game an edit may change. Deliberately excludes identity and lifecycle
+ * fields (status/createdBy/admins/joinCode/createdAt/tiebreakerAnswer/standingsSentFor):
+ * status transitions belong to closeGame, and the rest are set once at creation. Exported
+ * as a pure function so the field selection can be unit-tested without a live Firestore.
+ */
+export function gameUpdateFields(input: NewGameInput) {
+  return {
+    name: input.name.trim(),
+    promotion: input.promotion.trim(),
+    eventDate: input.eventDate,
+    lockTime: input.lockTime,
+    dayCount: Math.max(1, input.dayCount || 1),
+    matches: input.matches,
+    propBets: input.propBets,
+    tiebreakerQuestion: input.tiebreakerQuestion.trim(),
+  };
+}
+
+/**
+ * Super-Admin edit of a live game. The Firestore rules enforce the actual gate (superadmin +
+ * non-CLOSED); this just writes the editable fields. A plain admin's call is denied server-side.
+ */
+export async function updateGame(gameId: string, input: NewGameInput): Promise<void> {
+  await updateDoc(doc(reqDb(), 'games', gameId), gameUpdateFields(input));
+}
+
 // ---------- submissions ----------
 
 export function subscribeMySubmission(
