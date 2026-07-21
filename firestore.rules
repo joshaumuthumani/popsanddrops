@@ -86,11 +86,18 @@ service cloud.firestore {
       // Any admin can create a game; they must own createdBy.
       allow create: if isAdmin()
                     && request.resource.data.createdBy == uid();
-      // Any admin edits the game (details, status transitions, lock time) — but a CLOSED
-      // game is final and cannot be edited further (the close itself is allowed because the
-      // pre-write status is not yet CLOSED).
-      allow update: if isAdmin()
-                    && resource.data.status != 'CLOSED';
+      // Any admin may CLOSE a game (status + tiebreakerAnswer only) — the pre-write status is
+      // not yet CLOSED, so the close itself is allowed. Broader, STRUCTURAL edits (matches,
+      // props, lockTime, name…) are a Super-Admin-only action. A CLOSED game is frozen for
+      // everyone. `standingsSentFor` is written by the sendNightStandings callable via the
+      // Admin SDK (which bypasses these rules), so it need not appear in the admin-close set.
+      allow update: if resource.data.status != 'CLOSED'
+                    && (
+                      isSuperAdmin()
+                      || (isAdmin()
+                          && request.resource.data.diff(resource.data)
+                               .affectedKeys().hasOnly(['status', 'tiebreakerAnswer']))
+                    );
       // Deleting a game is a Super-Admin-only governance action.
       allow delete: if isSuperAdmin();
 

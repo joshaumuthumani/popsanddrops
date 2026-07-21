@@ -308,6 +308,51 @@ describe('role escalation', () => {
   });
 });
 
+describe('editing a live game is super-admin-only', () => {
+  // Any admin may CLOSE a game (status + tiebreaker). Structural edits — matches, props,
+  // lockTime, name — are a Super-Admin-only action. This is the trust-boundary half of the
+  // "editing is super-admin-only" feature; the UI gate is convenience on top.
+  it('lets any admin close a game (status + tiebreaker only)', async () => {
+    const db = asAdmin();
+    await assertSucceeds(
+      setDoc(doc(db, 'games/openGame'), { status: 'CLOSED', tiebreakerAnswer: '12' }, { merge: true }),
+    );
+  });
+
+  it('refuses a plain admin changing a structural field (matches)', async () => {
+    const db = asAdmin();
+    await assertFails(
+      setDoc(
+        doc(db, 'games/openGame'),
+        { matches: [{ id: 'm1', name: 'X', options: ['a', 'b'] }] },
+        { merge: true },
+      ),
+    );
+  });
+
+  it('lets a super admin change a structural field on an OPEN game', async () => {
+    const db = asSuper();
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'games/openGame'),
+        { matches: [{ id: 'm1', name: 'X', options: ['a', 'b'] }], lockTime: LOCK_TIME },
+        { merge: true },
+      ),
+    );
+  });
+
+  it('refuses even a super admin editing a CLOSED game', async () => {
+    const db = asSuper();
+    await assertFails(
+      setDoc(
+        doc(db, 'games/closedGame'),
+        { matches: [{ id: 'm1', name: 'X', options: ['a', 'b'] }] },
+        { merge: true },
+      ),
+    );
+  });
+});
+
 describe('leaderboard is server-written only', () => {
   it('refuses a client write even from an admin', async () => {
     const db = asAdmin();
