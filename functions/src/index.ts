@@ -3,6 +3,7 @@
 //   • onGameClose          — on status -> CLOSED, apply the tiebreaker and email final results.
 //   • ingestPosterFromUrl  — re-host a pasted match-poster link into our own Storage bucket.
 //   • sendNightStandings   — admin-triggered interim standings for a multi-night card.
+//   • deleteGame           — super-admin-only hard delete of a game + all its subcollections.
 // The leaderboard doc lives at games/{gameId}/leaderboard/current (single doc, single listener).
 
 import { onDocumentWritten, onDocumentUpdated } from 'firebase-functions/v2/firestore';
@@ -20,6 +21,8 @@ const db = getFirestore();
 export { ingestPosterFromUrl } from './posters';
 // Admin-triggered interim standings for multi-night cards.
 export { sendNightStandings } from './standings';
+// Super-Admin-only hard delete (game + all subcollections) via Admin-SDK recursiveDelete.
+export { deleteGame } from './deleteGame';
 
 /** Reads a game's submissions + results, writes back per-submission scores and the leaderboard doc. */
 export async function recomputeGame(gameId: string): Promise<void> {
