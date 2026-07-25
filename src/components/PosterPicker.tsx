@@ -42,8 +42,8 @@ const urlInput = {
  * Match-poster control for the Game Builder. Both ingest paths land on a Storage URL,
  * so this component only ever hands `onChange` something from our own bucket.
  *
- * The preview is doing real work: it shows the same 16:9 crop the picks screen will use,
- * which is the admin's chance to swap a poster that crops badly.
+ * The preview is doing real work: it shows the same uncropped framing the picks screen uses,
+ * which is the admin's chance to see how a given poster's shape will sit before publishing.
  */
 export function PosterPicker({ value, onChange, uid, onPendingChange }: Props) {
   const [url, setUrl] = useState('');
@@ -99,13 +99,16 @@ export function PosterPicker({ value, onChange, uid, onPendingChange }: Props) {
         <img
           src={value}
           alt="Match poster preview"
-          // Sized to roughly match the poster column on the picks screen, so the admin sees
-          // the same 16:9 framing players will get.
+          // Mirrors the picks screen: the whole poster, uncropped. A 16:9 image fills the box;
+          // a taller one is bounded by maxHeight and centred on the card backdrop. This is the
+          // admin's chance to see exactly what players will get before publishing.
           style={{
             width: '100%',
             maxWidth: 420,
-            aspectRatio: '16 / 9',
-            objectFit: 'cover',
+            maxHeight: 260,
+            height: 'auto',
+            objectFit: 'contain',
+            background: 'var(--color-deepnavy)',
             borderRadius: 9,
             border: '1px solid rgba(255,255,255,.1)',
             display: 'block',

@@ -132,8 +132,15 @@ input[type='datetime-local']::-webkit-calendar-picker-indicator:hover {
 .poster-split__img {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
+  height: auto;
+  /* Show the whole poster, never crop it. A 16:9 poster fills the column exactly (its natural
+     height stays under the cap at every width this layout produces); a taller/portrait poster
+     is bounded by max-height and centred, with the card's own deepnavy behind the gutters so
+     they read as the card, not as bars. Earlier this was a hard 16:9 object-fit:cover, which
+     sheared the event logo and broadcast strip off real key art — see the match-posters spec. */
+  max-height: 380px;
+  object-fit: contain;
+  background: var(--color-deepnavy);
 }
 .poster-split__body {
   display: flex;
