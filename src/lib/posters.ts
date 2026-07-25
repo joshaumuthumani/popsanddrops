@@ -61,8 +61,46 @@ export async function uploadPosterFile(file: File, uid: string): Promise<string>
 
   const jpeg = await downscaleToJpeg(file);
   const objectRef = ref(storage, `posters/${uid}/${crypto.randomUUID()}.jpg`);
-  await uploadBytes(objectRef, jpeg, { contentType: 'image/jpeg' });
-  return getDownloadURL(objectRef);
+  try {
+    await uploadBytes(objectRef, jpeg, { contentType: 'image/jpeg' });
+    return await getDownloadURL(objectRef);
+  } catch (err) {
+    throw storageFailure(err);
+  }
+}
+
+/**
+ * Turns an opaque Firebase Storage error into a message the admin can act on. Without this,
+ * every Storage failure — a missing bucket config, undeployed rules, an expired session —
+ * collapses into the same generic "Something went wrong", which is impossible to debug from
+ * the live site. The raw code is also logged so it is visible in the browser console.
+ */
+function storageFailure(err: unknown): PosterError {
+  const code =
+    typeof err === 'object' && err !== null && 'code' in err
+      ? String((err as { code: unknown }).code)
+      : '';
+  // eslint-disable-next-line no-console
+  console.error('[poster upload] failed', code || err, err);
+
+  switch (code) {
+    case 'storage/unauthorized':
+      return new PosterError(
+        "Storage blocked this upload. Deploy storage.rules (firebase deploy --only storage) and confirm you're signed in as an admin.",
+      );
+    case 'storage/no-default-bucket':
+    case 'storage/unknown':
+      return new PosterError(
+        "This site's Storage bucket isn't set. Check VITE_FIREBASE_STORAGE_BUCKET matches the bucket in Firebase Console → Storage, then rebuild.",
+      );
+    case 'storage/unauthenticated':
+      return new PosterError('Your session expired. Sign in again, then retry the upload.');
+    case 'storage/retry-limit-exceeded':
+    case 'storage/canceled':
+      return new PosterError('Upload timed out. Check your connection and try again.');
+    default:
+      return new PosterError(code ? `Upload failed (${code}).` : 'Upload failed. Try again.');
+  }
 }
 
 /**
