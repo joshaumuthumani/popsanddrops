@@ -30,3 +30,6 @@ functions/lib
 
 # Superpowers brainstorming sessions
 .superpowers/
+
+# Installed agent skills (emilkowalski/skills etc.) — tooling, not app code
+.agents/

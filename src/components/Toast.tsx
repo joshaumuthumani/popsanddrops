@@ -12,7 +12,7 @@ export function Toast({ open, title, message, onClose }: ToastProps) {
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-6"
+      className="animate-fade fixed inset-0 z-[200] flex items-center justify-center p-6"
       style={{ background: 'rgba(8,10,15,.72)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
