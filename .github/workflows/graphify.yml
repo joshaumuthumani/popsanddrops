@@ -2,9 +2,9 @@ name: Graphify
 
 on:
   pull_request:
-    branches: [claude/affectionate-allen-ck53g3]
+    branches: [main]
   push:
-    branches: [claude/affectionate-allen-ck53g3]
+    branches: [main]
 
 concurrency:
   group: graphify-${{ github.ref }}
