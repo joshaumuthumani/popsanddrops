@@ -33,3 +33,4 @@ functions/lib
 
 # Installed agent skills (emilkowalski/skills etc.) — tooling, not app code
 .agents/
+graphify-out/
