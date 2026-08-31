@@ -43,10 +43,11 @@ jobs:
       - name: Refresh doc corpus (OpenRouter)
         if: hashFiles('docs/**') != ''
         continue-on-error: true
+        timeout-minutes: 10
         env:
           OPENAI_BASE_URL: https://openrouter.ai/api/v1
           OPENAI_API_KEY: ${{ secrets.OPENROUTER_KEY }}
-          GRAPHIFY_OPENAI_MODEL: deepseek/deepseek-v4-flash
+          GRAPHIFY_OPENAI_MODEL: google/gemini-3.7-flash
         run: |
           if [ -z "${OPENAI_API_KEY:-}" ]; then
             echo "::warning::OPENROUTER_KEY not set — doc layer not refreshed"
