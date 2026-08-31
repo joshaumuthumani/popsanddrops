@@ -19,7 +19,7 @@ export function PickButton({ selected, onClick, children, align = 'center', show
   return (
     <button
       onClick={onClick}
-      className="cursor-pointer font-extrabold transition-all duration-200"
+      className="cursor-pointer font-extrabold pick-btn"
       style={{
         fontFamily: 'inherit',
         fontSize: size === 'lg' ? 15 : 14.5,
