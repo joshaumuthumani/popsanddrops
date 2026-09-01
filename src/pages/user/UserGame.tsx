@@ -81,28 +81,33 @@ export function UserGame() {
           ]}
           value={screen}
           onChange={setScreen}
+          ariaControls={(value) => `${value}-panel`}
         />
       </div>
 
       {screen === 'predict' ? (
-        <MakePicks
-          game={game}
-          initialMatchPicks={submission?.matchPicks ?? {}}
-          initialPropPicks={submission?.propBetPicks ?? {}}
-          initialTiebreaker={submission?.tiebreakerAnswer ?? ''}
-          locked={locked}
-          saving={saving}
-          onSubmit={handleSubmit}
-          needsAttention={needsAttention}
-        />
+        <div id="predict-panel" role="tabpanel" aria-labelledby="tab-predict" tabIndex={0}>
+          <MakePicks
+            game={game}
+            initialMatchPicks={submission?.matchPicks ?? {}}
+            initialPropPicks={submission?.propBetPicks ?? {}}
+            initialTiebreaker={submission?.tiebreakerAnswer ?? ''}
+            locked={locked}
+            saving={saving}
+            onSubmit={handleSubmit}
+            needsAttention={needsAttention}
+          />
+        </div>
       ) : (
-        <PopRankings
-          game={game}
-          submission={submission}
-          results={results}
-          leaderboard={leaderboard}
-          meUid={user?.uid ?? ''}
-        />
+        <div id="live-panel" role="tabpanel" aria-labelledby="tab-live" tabIndex={0}>
+          <PopRankings
+            game={game}
+            submission={submission}
+            results={results}
+            leaderboard={leaderboard}
+            meUid={user?.uid ?? ''}
+          />
+        </div>
       )}
     </div>
   );

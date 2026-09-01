@@ -313,7 +313,9 @@ export function MakePicks({
                       {p.options.map((opt) => (
                         <button
                           key={opt}
+                          type="button"
                           onClick={() => setProp(p.id, opt)}
+                          aria-pressed={propPicks[p.id] === opt}
                           className="cursor-pointer font-extrabold transition-all duration-200"
                           style={{
                             fontFamily: 'inherit',
@@ -352,10 +354,12 @@ export function MakePicks({
           <div style={{ fontWeight: 900, fontSize: 11, letterSpacing: '.12em', color: '#E7C92F', marginBottom: 3 }}>TIEBREAKER</div>
           <div style={{ fontWeight: 700, fontSize: 14.5, color: '#C8D4E8' }}>{game.tiebreakerQuestion}</div>
         </div>
+        <label htmlFor="tiebreaker-input" className="sr-only">{game.tiebreakerQuestion}</label>
         <input
           type="number"
           placeholder="00"
           value={tiebreaker}
+          id="tiebreaker-input"
           disabled={locked}
           onChange={(e) => editable && setTiebreaker(e.target.value)}
           style={{

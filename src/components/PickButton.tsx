@@ -19,6 +19,8 @@ export function PickButton({ selected, onClick, children, align = 'center', show
   return (
     <button
       onClick={onClick}
+      type="button"
+      aria-pressed={selected}
       className="cursor-pointer font-extrabold pick-btn"
       style={{
         fontFamily: 'inherit',

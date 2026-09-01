@@ -9,6 +9,8 @@ interface SegmentedTabsProps<T extends string> {
   tabs: Tab<T>[];
   value: T;
   onChange: (value: T) => void;
+  /** Connect each tab to its associated tabpanel when the parent renders one. */
+  ariaControls?: (value: T) => string;
 }
 
 /**
@@ -20,7 +22,7 @@ interface SegmentedTabsProps<T extends string> {
  * position is measured from the active button so it stays correct at any label width, and
  * the slide is neutralised under `prefers-reduced-motion` by the global rule in index.css.
  */
-export function SegmentedTabs<T extends string>({ tabs, value, onChange }: SegmentedTabsProps<T>) {
+export function SegmentedTabs<T extends string>({ tabs, value, onChange, ariaControls }: SegmentedTabsProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [pill, setPill] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
@@ -45,6 +47,8 @@ export function SegmentedTabs<T extends string>({ tabs, value, onChange }: Segme
   return (
     <div
       ref={containerRef}
+      role="tablist"
+      aria-label="Game views"
       className="relative flex gap-1"
       style={{
         background: 'rgba(255,255,255,.05)',
@@ -78,6 +82,11 @@ export function SegmentedTabs<T extends string>({ tabs, value, onChange }: Segme
               btnRefs.current[t.value] = el;
             }}
             onClick={() => onChange(t.value)}
+            id={`tab-${t.value}`}
+            role="tab"
+            aria-selected={on}
+            aria-controls={ariaControls?.(t.value)}
+            tabIndex={on ? 0 : -1}
             className="seg-tab cursor-pointer font-extrabold relative"
             style={{
               border: 'none',
